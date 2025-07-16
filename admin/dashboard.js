@@ -1,12 +1,5 @@
-// 📌 Visual log function for mobile debugging
-function logToPage(message) {
-  const logBox = document.getElementById('debug-log');
-  logBox.style.display = 'block';
-  logBox.innerHTML = `<strong>Debug:</strong> ${message}`;
-}
-
-// 📌 Supabase setup
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+// dashboard.js
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 import {
   SUPABASE_URL,
   SUPABASE_SERVICE_KEY,
@@ -16,12 +9,14 @@ import {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// 📌 Quill editor
-const quill = new Quill('#editor', {
-  theme: 'snow'
-});
+// Debug output
+function logToPage(message) {
+  const logBox = document.getElementById('debug-log');
+  logBox.style.display = 'block';
+  logBox.innerHTML = `<strong>Debug:</strong> ${message}`;
+}
 
-// 📌 DOM Elements
+// Form elements
 const form = document.getElementById('product-form');
 const nameInput = document.getElementById('name');
 const categorySelect = document.getElementById('category');
@@ -32,10 +27,12 @@ const videoInput = document.getElementById('video');
 const imagePreview = document.getElementById('image-preview');
 const tableBody = document.getElementById('product-table-body');
 
-// 📌 Load categories
-async function loadCategories() {
-  const staticCategories = ["Syrups", "Tablets", "Injections", "Creams", "Supplements"];
-  staticCategories.forEach(cat => {
+const quill = new Quill('#editor', { theme: 'snow' });
+
+// Categories
+function loadCategories() {
+  const categories = ["Syrups", "Tablets", "Injections", "Creams", "Supplements"];
+  categories.forEach(cat => {
     const option = document.createElement('option');
     option.value = cat;
     option.textContent = cat;
@@ -43,7 +40,7 @@ async function loadCategories() {
   });
 }
 
-// 📌 Image preview
+// Image preview
 imagesInput.addEventListener('change', () => {
   imagePreview.innerHTML = '';
   Array.from(imagesInput.files).forEach(file => {
@@ -58,14 +55,12 @@ imagesInput.addEventListener('change', () => {
   });
 });
 
-// 📌 Upload to Supabase storage
+// Upload to Supabase
 async function uploadFile(file, bucket, path) {
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: true
-    });
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: '3600',
+    upsert: true
+  });
 
   if (error) throw error;
 
@@ -73,10 +68,9 @@ async function uploadFile(file, bucket, path) {
   return publicUrl;
 }
 
-// 📌 Handle form submission
+// Save Product
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  logToPage("🟢 Uploading product...");
 
   const name = nameInput.value.trim();
   const category = categorySelect.value;
@@ -85,44 +79,33 @@ form.addEventListener('submit', async (e) => {
   const description_html = quill.root.innerHTML;
 
   if (!name || !category || !price || !description_html) {
-    logToPage("❌ Please fill all required fields.");
+    alert("⚠️ Fill all required fields.");
     return;
   }
 
   try {
-    // Upload images
-    const imageFiles = Array.from(imagesInput.files);
     const imageUrls = [];
-
-    for (let i = 0; i < imageFiles.length; i++) {
-      const imgPath = `products/${Date.now()}_${imageFiles[i].name}`;
-      const url = await uploadFile(imageFiles[i], IMAGE_BUCKET, imgPath);
+    for (let i = 0; i < imagesInput.files.length; i++) {
+      const path = `products/${Date.now()}_${imagesInput.files[i].name}`;
+      const url = await uploadFile(imagesInput.files[i], IMAGE_BUCKET, path);
       imageUrls.push(url);
     }
 
-    // Upload video (optional)
     let videoUrl = '';
     if (videoInput.files.length > 0) {
-      const videoPath = `products/${Date.now()}_${videoInput.files[0].name}`;
-      videoUrl = await uploadFile(videoInput.files[0], VIDEO_BUCKET, videoPath);
+      const path = `products/${Date.now()}_${videoInput.files[0].name}`;
+      videoUrl = await uploadFile(videoInput.files[0], VIDEO_BUCKET, path);
     }
 
-    // Insert into Supabase
     const { error } = await supabase
       .from('products')
       .insert([{
-        name,
-        category,
-        tags,
-        price,
-        description_html,
-        image_urls: imageUrls,
-        video_url: videoUrl
+        name, category, tags, price, description_html, image_urls: imageUrls, video_url: videoUrl
       }]);
 
     if (error) throw error;
 
-    logToPage("✅ Product uploaded successfully!");
+    alert("✅ Product uploaded!");
     form.reset();
     quill.root.innerHTML = '';
     imagePreview.innerHTML = '';
@@ -133,7 +116,7 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// 📌 Load products
+// Load Products
 async function loadProducts() {
   tableBody.innerHTML = "<tr><td colspan='4'>⏳ Loading...</td></tr>";
 
@@ -143,13 +126,12 @@ async function loadProducts() {
     .order('created_at', { ascending: false });
 
   if (error || !products) {
-    logToPage("❌ Failed to load products.");
     tableBody.innerHTML = "<tr><td colspan='4'>❌ Failed to load products.</td></tr>";
     return;
   }
 
   if (products.length === 0) {
-    tableBody.innerHTML = "<tr><td colspan='4'>📭 No products found.</td></tr>";
+    tableBody.innerHTML = "<tr><td colspan='4'>📭 No products yet.</td></tr>";
     return;
   }
 
@@ -166,9 +148,9 @@ async function loadProducts() {
   });
 }
 
-// 📌 Delete product
+// Delete Product
 async function deleteProduct(id) {
-  if (!confirm("Are you sure you want to delete this product?")) return;
+  if (!confirm("❗ Delete this product?")) return;
 
   const { error } = await supabase
     .from('products')
@@ -176,14 +158,14 @@ async function deleteProduct(id) {
     .eq('id', id);
 
   if (error) {
-    logToPage("❌ Error deleting product.");
+    alert("❌ Failed to delete.");
     return;
   }
 
-  logToPage("🗑️ Product deleted.");
+  alert("🗑️ Deleted successfully.");
   loadProducts();
 }
 
-// 📌 Initial load
+// Init
 loadCategories();
 loadProducts();
