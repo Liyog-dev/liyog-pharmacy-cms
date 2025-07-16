@@ -1,163 +1,166 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Liyog Pharmacy Admin</title>
-
-  <!-- Quill Editor -->
-  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background-color: #f8f8f8;
-    }
-
-    h1, h2 {
-      color: #006400;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-
-    input, select, button {
-      width: 100%;
-      padding: 10px;
-      font-size: 14px;
-      margin-top: 5px;
-    }
-
-    button {
-      background-color: green;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .preview-img {
-      height: 100px;
-      margin-right: 10px;
-      margin-bottom: 10px;
-    }
-
-    .quill-editor {
-      height: 200px;
-      margin-top: 10px;
-    }
-
-    .image-preview-container {
-      display: flex;
-      flex-wrap: wrap;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: left;
-    }
-
-    #log-panel {
-      background: #000;
-      color: #0f0;
-      padding: 10px;
-      margin-top: 20px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-  </style>
-</head>
-
-<body>
-  <h1>📦 Upload Product – Liyog Pharmacy</h1>
-
-  <form id="product-form">
-    <div class="form-group">
-      <label for="name">Product Name</label>
-      <input type="text" id="name" required>
-    </div>
-
-    <div class="form-group">
-      <label for="category">Category</label>
-      <select id="category" required>
-        <option value="">-- Select Category --</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label for="tags">Tags (comma-separated)</label>
-      <input type="text" id="tags">
-    </div>
-
-    <div class="form-group">
-      <label for="price">Price (₦)</label>
-      <input type="number" id="price" step="0.01" required>
-    </div>
-
-    
-
-
-    <div class="form-group">
-      <label>Product Description</label>
-      <div id="editor" class="quill-editor"></div>
-    </div>
-
-    <div class="form-group">
-      <label for="images">Upload Images</label>
-      <input type="file" id="images" multiple accept="image/*">
-      <div class="image-preview-container" id="image-preview"></div>
-    </div>
-
-    <div class="form-group">
-      <label for="video">Upload Video (optional)</label>
-      <input type="file" id="video" accept="video/*">
-    </div>
-
-    <button type="submit">💾 Save Product</button>
-  </form>
-
-  <div class="product-list">
-    <h2>📋 Uploaded Products</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>#ID</th>
-          <th>Name</th>
-          <th>Category</th>
-          <th>Price</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="product-table-body"></tbody>
-    </table>
-  </div>
-
-  <!-- Debug Log Panel -->
-  <div id="log-panel">
-    🟢 Debug Logs:<br>
-  </div>
-
-  <!-- Libraries -->
-  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
-  <!-- App Scripts -->
-  <script src="config.js"></script>
-  <script src="dashboard.js"></script>
-</body>
-        </html>
+‎<!doctype html>
+‎<html lang="en">
+‎<head>
+‎  <meta charset="UTF-8">
+‎  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+‎  <title>Liyog Pharmacy Admin</title>
+‎
+‎  <!-- Quill Editor -->
+‎  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+‎
+‎  <style>
+‎    body {
+‎      font-family: sans-serif;
+‎      padding: 20px;
+‎      background-color: #f8f8f8;
+‎    }
+‎
+‎    h1, h2 {
+‎      color: #006400;
+‎    }
+‎
+‎    .form-group {
+‎      margin-bottom: 15px;
+‎    }
+‎
+‎    label {
+‎      display: block;
+‎      font-weight: bold;
+‎      margin-bottom: 5px;
+‎    }
+‎
+‎    input, select, button {
+‎      width: 100%;
+‎      padding: 10px;
+‎      font-size: 14px;
+‎      margin-top: 5px;
+‎    }
+‎
+‎    button {
+‎      background-color: green;
+‎      color: white;
+‎      border: none;
+‎      border-radius: 5px;
+‎      cursor: pointer;
+‎    }
+‎
+‎    .preview-img {
+‎      height: 100px;
+‎      margin-right: 10px;
+‎      margin-bottom: 10px;
+‎    }
+‎
+‎    .quill-editor {
+‎      height: 200px;
+‎      margin-top: 10px;
+‎    }
+‎
+‎    .image-preview-container {
+‎      display: flex;
+‎      flex-wrap: wrap;
+‎    }
+‎
+‎    table {
+‎      width: 100%;
+‎      border-collapse: collapse;
+‎      margin-top: 20px;
+‎    }
+‎
+‎    th, td {
+‎      border: 1px solid #ddd;
+‎      padding: 10px;
+‎      text-align: left;
+‎    }
+‎
+‎    #log-panel {
+‎      background: #000;
+‎      color: #0f0;
+‎      padding: 10px;
+‎      margin-top: 20px;
+‎      font-family: monospace;
+‎      font-size: 12px;
+‎    }
+‎  </style>
+‎</head>
+‎
+‎<body>
+‎  <h1>📦 Upload Product – Liyog Pharmacy</h1>
+‎
+‎  <form id="product-form">
+‎    <div class="form-group">
+‎      <label for="name">Product Name</label>
+‎      <input type="text" id="name" required>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="category">Category</label>
+‎      <select id="category" required>
+‎        <option value="">-- Select Category --</option>
+‎      </select>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="tags">Tags (comma-separated)</label>
+‎      <input type="text" id="tags">
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="price">Price (₦)</label>
+‎      <input type="number" id="price" step="0.01" required>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="discount">Discount (%) – optional</label>
+‎      <input type="number" id="discount" step="1" min="0" max="100" placeholder="e.g. 20">
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label>Product Description</label>
+‎      <div id="editor" class="quill-editor"></div>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="images">Upload Images</label>
+‎      <input type="file" id="images" multiple accept="image/*">
+‎      <div class="image-preview-container" id="image-preview"></div>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="video">Upload Video (optional)</label>
+‎      <input type="file" id="video" accept="video/*">
+‎    </div>
+‎
+‎    <button type="submit">💾 Save Product</button>
+‎  </form>
+‎
+‎  <div class="product-list">
+‎    <h2>📋 Uploaded Products</h2>
+‎    <table>
+‎      <thead>
+‎        <tr>
+‎          <th>#ID</th>
+‎          <th>Name</th>
+‎          <th>Category</th>
+‎          <th>Price</th>
+‎          <th>Actions</th>
+‎        </tr>
+‎      </thead>
+‎      <tbody id="product-table-body"></tbody>
+‎    </table>
+‎  </div>
+‎
+‎  <!-- Debug Log Panel -->
+‎  <div id="log-panel">
+‎    🟢 Debug Logs:<br>
+‎  </div>
+‎
+‎  <!-- Libraries -->
+‎  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+‎  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+‎
+‎  <!-- App Scripts -->
+‎  <script src="config.js"></script>
+‎  <script src="dashboard.js"></script>
+‎</body>
+‎        </html>
+‎
