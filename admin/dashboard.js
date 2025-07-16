@@ -1,4 +1,11 @@
 // dashboard.js
+
+function logToPage(message) {
+  const logBox = document.getElementById('debug-log');
+  logBox.style.display = 'block';
+  logBox.innerHTML = `<strong>Debug:</strong> ${message}`;
+}
+
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY } from './config.js';
 
@@ -118,8 +125,7 @@ form.addEventListener('submit', async (e) => {
     loadProducts(); // reload product list
 
   } catch (err) {
-    console.error(err);
-    alert("❌ Failed to upload product.");
+    logToPage("❌ Upload failed: " + err.message);
   }
 });
 
