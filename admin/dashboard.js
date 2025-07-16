@@ -1,21 +1,27 @@
-// dashboard.js
-
+// 📌 Visual log function for mobile debugging
 function logToPage(message) {
   const logBox = document.getElementById('debug-log');
   logBox.style.display = 'block';
   logBox.innerHTML = `<strong>Debug:</strong> ${message}`;
 }
 
+// 📌 Supabase setup
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-import { SUPABASE_URL, SUPABASE_SERVICE_KEY } from './config.js';
+import {
+  SUPABASE_URL,
+  SUPABASE_SERVICE_KEY,
+  IMAGE_BUCKET,
+  VIDEO_BUCKET
+} from './config.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Initialize Quill editor
+// 📌 Quill editor
 const quill = new Quill('#editor', {
   theme: 'snow'
 });
 
+// 📌 DOM Elements
 const form = document.getElementById('product-form');
 const nameInput = document.getElementById('name');
 const categorySelect = document.getElementById('category');
@@ -26,9 +32,8 @@ const videoInput = document.getElementById('video');
 const imagePreview = document.getElementById('image-preview');
 const tableBody = document.getElementById('product-table-body');
 
-// ========== LOAD CATEGORIES ==========
+// 📌 Load categories
 async function loadCategories() {
-  // Optionally, replace with dynamic fetch from a "categories" table
   const staticCategories = ["Syrups", "Tablets", "Injections", "Creams", "Supplements"];
   staticCategories.forEach(cat => {
     const option = document.createElement('option');
@@ -38,7 +43,7 @@ async function loadCategories() {
   });
 }
 
-// ========== IMAGE PREVIEW ==========
+// 📌 Image preview
 imagesInput.addEventListener('change', () => {
   imagePreview.innerHTML = '';
   Array.from(imagesInput.files).forEach(file => {
@@ -53,9 +58,9 @@ imagesInput.addEventListener('change', () => {
   });
 });
 
-// ========== UPLOAD FILE TO SUPABASE ==========
+// 📌 Upload to Supabase storage
 async function uploadFile(file, bucket, path) {
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from(bucket)
     .upload(path, file, {
       cacheControl: '3600',
@@ -68,9 +73,10 @@ async function uploadFile(file, bucket, path) {
   return publicUrl;
 }
 
-// ========== SAVE PRODUCT ==========
+// 📌 Handle form submission
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+  logToPage("🟢 Uploading product...");
 
   const name = nameInput.value.trim();
   const category = categorySelect.value;
@@ -79,12 +85,12 @@ form.addEventListener('submit', async (e) => {
   const description_html = quill.root.innerHTML;
 
   if (!name || !category || !price || !description_html) {
-    alert("Please fill all required fields.");
+    logToPage("❌ Please fill all required fields.");
     return;
   }
 
   try {
-    // Upload Images
+    // Upload images
     const imageFiles = Array.from(imagesInput.files);
     const imageUrls = [];
 
@@ -94,42 +100,40 @@ form.addEventListener('submit', async (e) => {
       imageUrls.push(url);
     }
 
-    // Upload Video (optional)
+    // Upload video (optional)
     let videoUrl = '';
     if (videoInput.files.length > 0) {
       const videoPath = `products/${Date.now()}_${videoInput.files[0].name}`;
       videoUrl = await uploadFile(videoInput.files[0], VIDEO_BUCKET, videoPath);
     }
 
-    // Save to Supabase table
-    const { data, error } = await supabase
+    // Insert into Supabase
+    const { error } = await supabase
       .from('products')
-      .insert([
-        {
-          name,
-          category,
-          tags,
-          price,
-          description_html,
-          image_urls: imageUrls,
-          video_url: videoUrl
-        }
-      ]);
+      .insert([{
+        name,
+        category,
+        tags,
+        price,
+        description_html,
+        image_urls: imageUrls,
+        video_url: videoUrl
+      }]);
 
     if (error) throw error;
 
-    alert("✅ Product uploaded successfully!");
+    logToPage("✅ Product uploaded successfully!");
     form.reset();
     quill.root.innerHTML = '';
     imagePreview.innerHTML = '';
-    loadProducts(); // reload product list
+    loadProducts();
 
   } catch (err) {
     logToPage("❌ Upload failed: " + err.message);
   }
 });
 
-// ========== LOAD PRODUCTS ==========
+// 📌 Load products
 async function loadProducts() {
   tableBody.innerHTML = "<tr><td colspan='4'>⏳ Loading...</td></tr>";
 
@@ -139,6 +143,7 @@ async function loadProducts() {
     .order('created_at', { ascending: false });
 
   if (error || !products) {
+    logToPage("❌ Failed to load products.");
     tableBody.innerHTML = "<tr><td colspan='4'>❌ Failed to load products.</td></tr>";
     return;
   }
@@ -161,7 +166,7 @@ async function loadProducts() {
   });
 }
 
-// ========== DELETE PRODUCT ==========
+// 📌 Delete product
 async function deleteProduct(id) {
   if (!confirm("Are you sure you want to delete this product?")) return;
 
@@ -171,14 +176,14 @@ async function deleteProduct(id) {
     .eq('id', id);
 
   if (error) {
-    alert("❌ Error deleting product.");
+    logToPage("❌ Error deleting product.");
     return;
   }
 
-  alert("🗑️ Product deleted.");
+  logToPage("🗑️ Product deleted.");
   loadProducts();
 }
 
-// Initial Load
+// 📌 Initial load
 loadCategories();
 loadProducts();
