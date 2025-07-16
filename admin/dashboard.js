@@ -1,4 +1,4 @@
-// ✅ dashboard.js (Fully Patched – Multi Image Upload, Preview, Logging, Discount Handling)
+// ✅ dashboard.js (Fully Patched – Multi Image Upload, Preview, Logging, Discount Support)
 
 const log = (msg) => {
   const logPanel = document.getElementById("log-panel");
@@ -12,7 +12,7 @@ const nameInput = document.getElementById("name");
 const categoryInput = document.getElementById("category");
 const tagsInput = document.getElementById("tags");
 const priceInput = document.getElementById("price");
-const discountInput = document.getElementById("discount_percent"); // <-- Make sure this input exists
+const discountInput = document.getElementById("discount_percent"); // 🔄 added input
 const imagesInput = document.getElementById("images");
 const videoInput = document.getElementById("video");
 const previewContainer = document.getElementById("image-preview");
@@ -77,7 +77,11 @@ form.addEventListener("submit", async (e) => {
   }
 
   const { error } = await supabase.from("products").insert([{
-    name, category, tags, price, discount_percent: discount,
+    name,
+    category,
+    tags,
+    price,
+    discount_percent: discount,
     description_html: description,
     image_urls: imageUrls,
     video_url: videoUrl
@@ -113,29 +117,26 @@ imagesInput.addEventListener("change", () => {
 async function loadProducts() {
   const { data, error } = await supabase
     .from("products")
-    .select("id, product_number, name, category, price, discount_percent");
+    .select("id, name, category, price, discount_percent");
 
   if (data) {
     productTable.innerHTML = data.map(p => {
-      let priceHTML = '';
       const discount = parseFloat(p.discount_percent) || 0;
+      let priceHTML = '';
+
       if (discount > 0) {
         const discountedPrice = p.price - (p.price * discount / 100);
-        priceHTML = `<del>₦${p.price}</del> ₦${discountedPrice} (${discount}% OFF)`;
+        priceHTML = `<del>₦${p.price}</del> ₦${discountedPrice.toFixed(2)} (${discount}% OFF)`;
       } else {
         priceHTML = `₦${p.price}`;
       }
 
       return `
         <tr>
-          <td>#${p.product_number || p.id}</td>
           <td>${p.name}</td>
           <td>${p.category}</td>
           <td>${priceHTML}</td>
-          <td>
-            <button onclick="editProduct('${p.id}')">✏️ Edit</button>
-            <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
-          </td>
+          <td><button onclick="deleteProduct('${p.id}')">🗑 Delete</button></td>
         </tr>`;
     }).join("");
   }
