@@ -1,45 +1,41 @@
-// 🌐 Global Elements
+// ✅ dashboard.js (Fully Patched – Multi Image Upload, Preview, Logging, Discount Handling)
+
+const log = (msg) => {
+  const logPanel = document.getElementById("log-panel");
+  logPanel.innerHTML += `> ${msg}<br/>`;
+};
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const form = document.getElementById("product-form");
 const nameInput = document.getElementById("name");
 const categoryInput = document.getElementById("category");
 const tagsInput = document.getElementById("tags");
 const priceInput = document.getElementById("price");
+const discountInput = document.getElementById("discount_percent"); // <-- Make sure this input exists
 const imagesInput = document.getElementById("images");
 const videoInput = document.getElementById("video");
 const previewContainer = document.getElementById("image-preview");
 const productTable = document.getElementById("product-table-body");
-const discountInput = document.getElementById("discount"); // optional field
+
 const quill = new Quill("#editor", { theme: "snow" });
 
-// 🧠 Logging Panel
-const log = (msg) => {
-  document.getElementById("log-panel").innerHTML += `> ${msg}<br/>`;
-};
-
-// ☁️ Uploading Files to Supabase
 async function uploadFile(file, bucket) {
-  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
-  const { error } = await client.storage.from(bucket).upload(uniqueId, file, {
-    cacheControl: '3600',
-    upsert: false
-  });
-  if (error) {
-    log(`❌ Upload error: ${error.message}`);
-    throw error;
-  }
-  const { data } = client.storage.from(bucket).getPublicUrl(uniqueId);
+  const path = `products/${Date.now()}_${file.name}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file);
+  if (error) throw error;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 
-// 🔄 Load Static Categories
 async function fetchCategories() {
-  const defaultCategories = [
-    "Pain Relief", "Antibiotics", "Skincare", "Cough Syrups", "Tablets", "Injections"
-  ];
-  categoryInput.innerHTML += defaultCategories.map(c => `<option value="${c}">${c}</option>`).join("");
+  const { data, error } = await supabase.from("products").select("category");
+  if (data) {
+    const uniqueCategories = [...new Set(data.map(p => p.category))];
+    categoryInput.innerHTML += uniqueCategories.map(c => `<option value="${c}">${c}</option>`).join("");
+  }
 }
 
-// 🧾 Form Submit (Product Save)
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -47,7 +43,7 @@ form.addEventListener("submit", async (e) => {
   const category = categoryInput.value;
   const tags = tagsInput.value.trim();
   const price = parseFloat(priceInput.value);
-  const discount = discountInput?.value ? parseFloat(discountInput.value) : null;
+  const discount = parseFloat(discountInput.value) || 0;
   const description = quill.root.innerHTML.trim();
   const imageFiles = Array.from(imagesInput.files);
   const videoFile = videoInput.files[0];
@@ -57,7 +53,6 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  // 🖼 Uploading Images
   const imageUrls = [];
   for (let file of imageFiles) {
     try {
@@ -65,12 +60,12 @@ form.addEventListener("submit", async (e) => {
       imageUrls.push(url);
       log(`✅ Uploaded image: ${file.name}`);
     } catch (err) {
-      log(`❌ Image upload failed: ${file.name}`);
+      log(`❌ Failed image: ${file.name}`);
+      alert("Image upload failed. Check log.");
       return;
     }
   }
 
-  // 🎞 Uploading Video
   let videoUrl = "";
   if (videoFile) {
     try {
@@ -81,25 +76,19 @@ form.addEventListener("submit", async (e) => {
     }
   }
 
-  // ✅ Saving to Supabase
-  const { error } = await client.from("products").insert([{
-    name,
-    category,
-    tags,
-    price,
-    discount_percent: discount,
+  const { error } = await supabase.from("products").insert([{
+    name, category, tags, price, discount_percent: discount,
     description_html: description,
     image_urls: imageUrls,
-    video_url: videoUrl,
-    published: true  // default publish for now
+    video_url: videoUrl
   }]);
 
   if (error) {
     log(`❌ DB Error: ${error.message}`);
     alert("Failed to upload product.");
   } else {
-    log("✅ Product saved!");
-    alert("Product uploaded successfully!");
+    log("✅ Product saved successfully.");
+    alert("Product uploaded!");
     form.reset();
     quill.setContents([]);
     previewContainer.innerHTML = "";
@@ -107,7 +96,6 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-// 📷 Preview Image
 imagesInput.addEventListener("change", () => {
   previewContainer.innerHTML = "";
   [...imagesInput.files].forEach(file => {
@@ -122,49 +110,46 @@ imagesInput.addEventListener("change", () => {
   });
 });
 
-// 📥 Load Products into Table
 async function loadProducts() {
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from("products")
-    .select("id, name, category, price, product_number, discount_percent");
+    .select("id, product_number, name, category, price, discount_percent");
 
   if (data) {
-    productTable.innerHTML = data.map(p => `
-      <tr>
-        <td>#${p.product_number || "—"}</td>
-        <td>${p.name}</td>
-        <td>${p.category}</td>
-        <td>
-          ${p.discount_percent ? `
-            <s>₦${p.price}</s> 
-            <strong>(${p.discount_percent}% OFF)</strong>
-          ` : `₦${p.price}`}
-        </td>
-        <td>
-          <button onclick="editProduct('${p.id}')">✏️ Edit</button>
-          <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
-        </td>
-      </tr>
-    `).join("");
+    productTable.innerHTML = data.map(p => {
+      let priceHTML = '';
+      const discount = parseFloat(p.discount_percent) || 0;
+      if (discount > 0) {
+        const discountedPrice = p.price - (p.price * discount / 100);
+        priceHTML = `<del>₦${p.price}</del> ₦${discountedPrice} (${discount}% OFF)`;
+      } else {
+        priceHTML = `₦${p.price}`;
+      }
+
+      return `
+        <tr>
+          <td>#${p.product_number || p.id}</td>
+          <td>${p.name}</td>
+          <td>${p.category}</td>
+          <td>${priceHTML}</td>
+          <td>
+            <button onclick="editProduct('${p.id}')">✏️ Edit</button>
+            <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
+          </td>
+        </tr>`;
+    }).join("");
   }
 }
 
-// 🧹 Delete Product
 async function deleteProduct(id) {
-  const { error } = await client.from("products").delete().eq("id", id);
+  const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) {
-    alert("❌ Failed to delete");
+    alert("Failed to delete");
   } else {
-    alert("🗑 Product deleted");
+    alert("Deleted");
     loadProducts();
   }
 }
 
-// ✏️ Edit Hook (To be implemented)
-function editProduct(id) {
-  alert("🧪 Edit mode coming soon for product ID: " + id);
-}
-
-// 🧭 Load Initial Data
 fetchCategories();
 loadProducts();
