@@ -1,250 +1,251 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Liyog Pharmacy Admin</title>
-
-  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet"/>
-
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f8f8f8;
-      padding: 20px;
-      max-width: 1000px;
-      margin: auto;
-    }
-    h1, h2 {
-      color: #006400;
-    }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    input, select, button, textarea {
-      width: 100%;
-      padding: 10px;
-      font-size: 14px;
-    }
-    button {
-      background-color: green;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .preview-img {
-      height: 100px;
-      margin-right: 10px;
-      margin-bottom: 10px;
-    }
-    .quill-editor {
-      height: 200px;
-      margin-top: 10px;
-    }
-    .image-preview-container {
-      display: flex;
-      flex-wrap: wrap;
-    }
-    .thumbnail-img {
-      height: 50px;
-      margin-right: 5px;
-      border-radius: 4px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 10px;
-      border: 1px solid #ccc;
-      text-align: left;
-    }
-    #log-panel {
-      background: #000;
-      color: #0f0;
-      font-family: monospace;
-      font-size: 12px;
-      padding: 10px;
-      margin-top: 20px;
-    }
-    #preview-modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: rgba(0,0,0,0.7);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-    }
-    #preview-modal .content {
-      background: white;
-      max-width: 600px;
-      padding: 20px;
-      border-radius: 10px;
-      overflow-y: auto;
-      max-height: 90vh;
-    }
-    #preview-modal img, #preview-modal video {
-      max-width: 100%;
-      border-radius: 5px;
-      margin-top: 10px;
-    }
-    #preview-modal button {
-      margin-top: 20px;
-      background: red;
-    }
-    .filters {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-    .switch {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    @media (max-width: 600px) {
-      table, thead, tbody, th, td, tr {
-        display: block;
-      }
-      thead tr {
-        display: none;
-      }
-      td {
-        position: relative;
-        padding-left: 50%;
-        border: none;
-        border-bottom: 1px solid #ccc;
-      }
-      td::before {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        width: 45%;
-        white-space: nowrap;
-        font-weight: bold;
-      }
-      td:nth-child(1)::before { content: "#ID"; }
-      td:nth-child(2)::before { content: "Thumbnail"; }
-      td:nth-child(3)::before { content: "Name"; }
-      td:nth-child(4)::before { content: "Category"; }
-      td:nth-child(5)::before { content: "Price"; }
-      td:nth-child(6)::before { content: "Status"; }
-      td:nth-child(7)::before { content: "Actions"; }
-    }
-  </style>
-</head>
-<body>
-
-  <h1>📦 Upload Product – Liyog Pharmacy</h1>
-
-  <form id="product-form">
-    <div class="form-group">
-      <label for="name">Product Name</label>
-      <input type="text" id="name" required>
-    </div>
-
-    <div class="form-group">
-      <label for="category">Category</label>
-      <select id="category" required>
-        <option value="">-- Select Category --</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label for="tags">Tags (comma-separated)</label>
-      <input type="text" id="tags">
-    </div>
-
-    <div class="form-group">
-      <label for="price">Price (₦)</label>
-      <input type="number" id="price" step="0.01" required>
-    </div>
-
-    <div class="form-group">
-      <label for="discount">Discount (%) – optional</label>
-      <input type="number" id="discount" min="0" max="100" step="1">
-    </div>
-
-    <div class="form-group">
-      <label>Description</label>
-      <div id="editor" class="quill-editor"></div>
-    </div>
-
-    <div class="form-group">
-      <label for="images">Upload Images</label>
-      <input type="file" id="images" multiple accept="image/*">
-      <div id="image-preview" class="image-preview-container"></div>
-    </div>
-
-    <div class="form-group">
-      <label for="video">Upload Video (optional)</label>
-      <input type="file" id="video" accept="video/*">
-    </div>
-
-    <div class="form-group switch">
-      <label for="published">Publish Product?</label>
-      <input type="checkbox" id="published" checked>
-    </div>
-
-    <div class="form-group">
-      <button type="button" id="preview-btn">👁 Preview</button>
-    </div>
-
-    <div class="form-group">
-      <button type="submit" id="submit-btn">💾 Save Product</button>
-    </div>
-  </form>
-
-  <!-- Preview Modal -->
-  <div id="preview-modal">
-    <div class="content" id="preview-content"></div>
-  </div>
-
-  <!-- Search and Filters -->
-  <div class="filters">
-    <input type="text" id="search" placeholder="🔍 Search products...">
-    <select id="filter-category">
-      <option value="">Filter by Category</option>
-    </select>
-  </div>
-
-  <!-- Uploaded Product List -->
-  <div class="product-list">
-    <h2>📋 Uploaded Products</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>#No.</th>
-          <th>Thumbnail</th>
-          <th>Name</th>
-          <th>Category</th>
-          <th>Price</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="product-table-body"></tbody>
-    </table>
-    <div id="pagination" style="margin-top:10px;"></div>
-  </div>
-
-  <!-- Log Panel -->
-  <div id="log-panel">🟢 Debug Logs:<br></div>
-
-  <!-- Scripts -->
-  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <script src="config.js"></script>
-  <script src="dashboard.js"></script>
-</body>
-  </html>
-  
+‎<!DOCTYPE html>
+‎<html lang="en">
+‎<head>
+‎  <meta charset="UTF-8" />
+‎  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+‎  <title>Liyog Pharmacy Admin</title>
+‎
+‎  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet"/>
+‎
+‎  <style>
+‎    body {
+‎      font-family: sans-serif;
+‎      background: #f8f8f8;
+‎      padding: 20px;
+‎      max-width: 1000px;
+‎      margin: auto;
+‎    }
+‎    h1, h2 {
+‎      color: #006400;
+‎    }
+‎    .form-group {
+‎      margin-bottom: 15px;
+‎    }
+‎    label {
+‎      display: block;
+‎      font-weight: bold;
+‎      margin-bottom: 5px;
+‎    }
+‎    input, select, button, textarea {
+‎      width: 100%;
+‎      padding: 10px;
+‎      font-size: 14px;
+‎    }
+‎    button {
+‎      background-color: green;
+‎      color: white;
+‎      border: none;
+‎      border-radius: 5px;
+‎      cursor: pointer;
+‎    }
+‎    .preview-img {
+‎      height: 100px;
+‎      margin-right: 10px;
+‎      margin-bottom: 10px;
+‎    }
+‎    .quill-editor {
+‎      height: 200px;
+‎      margin-top: 10px;
+‎    }
+‎    .image-preview-container {
+‎      display: flex;
+‎      flex-wrap: wrap;
+‎    }
+‎    .thumbnail-img {
+‎      height: 50px;
+‎      margin-right: 5px;
+‎      border-radius: 4px;
+‎    }
+‎    table {
+‎      width: 100%;
+‎      border-collapse: collapse;
+‎      margin-top: 20px;
+‎    }
+‎    th, td {
+‎      padding: 10px;
+‎      border: 1px solid #ccc;
+‎      text-align: left;
+‎    }
+‎    #log-panel {
+‎      background: #000;
+‎      color: #0f0;
+‎      font-family: monospace;
+‎      font-size: 12px;
+‎      padding: 10px;
+‎      margin-top: 20px;
+‎    }
+‎    #preview-modal {
+‎      position: fixed;
+‎      top: 0; left: 0; right: 0; bottom: 0;
+‎      background-color: rgba(0,0,0,0.7);
+‎      display: none;
+‎      align-items: center;
+‎      justify-content: center;
+‎      z-index: 9999;
+‎    }
+‎    #preview-modal .content {
+‎      background: white;
+‎      max-width: 600px;
+‎      padding: 20px;
+‎      border-radius: 10px;
+‎      overflow-y: auto;
+‎      max-height: 90vh;
+‎    }
+‎    #preview-modal img, #preview-modal video {
+‎      max-width: 100%;
+‎      border-radius: 5px;
+‎      margin-top: 10px;
+‎    }
+‎    #preview-modal button {
+‎      margin-top: 20px;
+‎      background: red;
+‎    }
+‎    .filters {
+‎      display: flex;
+‎      gap: 10px;
+‎      margin-bottom: 10px;
+‎      flex-wrap: wrap;
+‎    }
+‎    .switch {
+‎      display: flex;
+‎      align-items: center;
+‎      gap: 5px;
+‎    }
+‎    @media (max-width: 600px) {
+‎      table, thead, tbody, th, td, tr {
+‎        display: block;
+‎      }
+‎      thead tr {
+‎        display: none;
+‎      }
+‎      td {
+‎        position: relative;
+‎        padding-left: 50%;
+‎        border: none;
+‎        border-bottom: 1px solid #ccc;
+‎      }
+‎      td::before {
+‎        position: absolute;
+‎        top: 10px;
+‎        left: 10px;
+‎        width: 45%;
+‎        white-space: nowrap;
+‎        font-weight: bold;
+‎      }
+‎      td:nth-child(1)::before { content: "#ID"; }
+‎      td:nth-child(2)::before { content: "Thumbnail"; }
+‎      td:nth-child(3)::before { content: "Name"; }
+‎      td:nth-child(4)::before { content: "Category"; }
+‎      td:nth-child(5)::before { content: "Price"; }
+‎      td:nth-child(6)::before { content: "Status"; }
+‎      td:nth-child(7)::before { content: "Actions"; }
+‎    }
+‎  </style>
+‎</head>
+‎<body>
+‎
+‎  <h1>📦 Upload Product – Liyog Pharmacy</h1>
+‎
+‎  <form id="product-form">
+‎    <div class="form-group">
+‎      <label for="name">Product Name</label>
+‎      <input type="text" id="name" required>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="category">Category</label>
+‎      <select id="category" required>
+‎        <option value="">-- Select Category --</option>
+‎      </select>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="tags">Tags (comma-separated)</label>
+‎      <input type="text" id="tags">
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="price">Price (₦)</label>
+‎      <input type="number" id="price" step="0.01" required>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="discount">Discount (%) – optional</label>
+‎      <input type="number" id="discount" min="0" max="100" step="1">
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label>Description</label>
+‎      <div id="editor" class="quill-editor"></div>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="images">Upload Images</label>
+‎      <input type="file" id="images" multiple accept="image/*">
+‎      <div id="image-preview" class="image-preview-container"></div>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <label for="video">Upload Video (optional)</label>
+‎      <input type="file" id="video" accept="video/*">
+‎    </div>
+‎
+‎    <div class="form-group switch">
+‎      <label for="published">Publish Product?</label>
+‎      <input type="checkbox" id="published" checked>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <button type="button" id="preview-btn">👁 Preview</button>
+‎    </div>
+‎
+‎    <div class="form-group">
+‎      <button type="submit" id="submit-btn">💾 Save Product</button>
+‎    </div>
+‎  </form>
+‎
+‎  <!-- Preview Modal -->
+‎  <div id="preview-modal">
+‎    <div class="content" id="preview-content"></div>
+‎  </div>
+‎
+‎  <!-- Search and Filters -->
+‎  <div class="filters">
+‎    <input type="text" id="search" placeholder="🔍 Search products...">
+‎    <select id="filter-category">
+‎      <option value="">Filter by Category</option>
+‎    </select>
+‎  </div>
+‎
+‎  <!-- Uploaded Product List -->
+‎  <div class="product-list">
+‎    <h2>📋 Uploaded Products</h2>
+‎    <table>
+‎      <thead>
+‎        <tr>
+‎          <th>#No.</th>
+‎          <th>Thumbnail</th>
+‎          <th>Name</th>
+‎          <th>Category</th>
+‎          <th>Price</th>
+‎          <th>Status</th>
+‎          <th>Actions</th>
+‎        </tr>
+‎      </thead>
+‎      <tbody id="product-table-body"></tbody>
+‎    </table>
+‎    <div id="pagination" style="margin-top:10px;"></div>
+‎  </div>
+‎
+‎  <!-- Log Panel -->
+‎  <div id="log-panel">🟢 Debug Logs:<br></div>
+‎
+‎  <!-- Scripts -->
+‎  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+‎  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+‎  <script src="config.js"></script>
+‎  <script src="dashboard.js"></script>
+‎</body>
+‎  </html>
+‎  
+‎
