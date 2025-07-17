@@ -1,55 +1,167 @@
-// dashboard.js
+// dashboard.js (fully fixed and polished version)
 
-const quill = new Quill('#editor', { theme: 'snow' });
+// Load products on page load
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchAndRenderProducts();
+});
 
-const form = document.getElementById('product-form'); const nameInput = document.getElementById('name'); const categoryInput = document.getElementById('category'); const tagsInput = document.getElementById('tags'); const priceInput = document.getElementById('price'); const discountInput = document.getElementById('discount'); const imageInput = document.getElementById('images'); const videoInput = document.getElementById('video'); const publishedInput = document.getElementById('published'); const previewBtn = document.getElementById('preview-btn'); const previewContent = document.getElementById('preview-content'); const previewModal = document.getElementById('preview-modal'); const submitBtn = document.getElementById('submit-btn'); const logPanel = document.getElementById('log-panel'); const tableBody = document.getElementById('product-table-body');
+// Global state for edit mode
+let editingProductId = null;
+let originalImageUrl = null;
+let originalVideoUrl = null;
 
-let editingId = null; let originalImageURLs = []; let originalVideoURL = null;
+// Fetch and render products
+async function fetchAndRenderProducts() {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-const log = (msg) => { logPanel.innerHTML += \n${msg}; };
+  if (error) {
+    console.error('Error fetching products:', error);
+    return;
+  }
 
-const resetForm = () => { form.reset(); quill.setText(''); document.getElementById('image-preview').innerHTML = ''; editingId = null; originalImageURLs = []; originalVideoURL = null; submitBtn.textContent = '💾 Save Product'; };
+  const container = document.getElementById('productList');
+  container.innerHTML = '';
 
-const renderImagePreviews = (urls) => { const container = document.getElementById('image-preview'); container.innerHTML = ''; urls.forEach(url => { const img = document.createElement('img'); img.src = url; img.className = 'preview-img'; container.appendChild(img); }); };
+  data.forEach(product => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
 
-const renderVideoPreview = (url) => { const container = document.getElementById('image-preview'); if (url) { const video = document.createElement('video'); video.src = url; video.controls = true; video.style.maxWidth = '100%'; video.style.marginTop = '10px'; container.appendChild(video); } };
+    card.innerHTML = `
+      <h3>${product.name} (#${String(product.product_number).padStart(3, '0')})</h3>
+      <p>${product.description}</p>
+      <p><strong>Price:</strong> ₦${product.final_price}</p>
+      ${product.percentage_discount ? `<p><del>₦${calculateOriginalPrice(product.final_price, product.percentage_discount)}</del> <span>(${product.percentage_discount}% OFF)</span></p>` : ''}
+      ${product.image_url ? `<img src="${product.image_url}" alt="Product Image" class="preview-img">` : ''}
+      ${product.video_url ? `<video src="${product.video_url}" controls class="preview-video"></video>` : ''}
+      <p>Status: <strong>${product.published ? 'Published ✅' : 'Unpublished ❌'}</strong></p>
+      <button onclick='editProduct(${JSON.stringify(product)})'>Edit</button>
+      <button onclick='previewProduct(${JSON.stringify(product)})'>Preview</button>
+    `;
+    container.appendChild(card);
+  });
+}
 
-const showPreviewModal = () => { const name = nameInput.value; const category = categoryInput.value; const tags = tagsInput.value; const price = priceInput.value; const discount = discountInput.value; const description = quill.root.innerHTML; const published = publishedInput.checked;
+// Calculate original price based on discount
+function calculateOriginalPrice(final, percent) {
+  return Math.round((final * 100) / (100 - percent));
+}
 
-previewContent.innerHTML = <h2>${name}</h2> <p><strong>Category:</strong> ${category}</p> <p><strong>Tags:</strong> ${tags}</p> <p><strong>Price:</strong> ₦${price}</p> <p><strong>Discount:</strong> ${discount || 0}%</p> <p><strong>Status:</strong> ${published ? 'Published' : 'Unpublished'}</p> <div>${description}</div>;
+// Handle form submission
+document.getElementById('productForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
 
-originalImageURLs.forEach(url => { const img = document.createElement('img'); img.src = url; previewContent.appendChild(img); });
+  const name = form.name.value;
+  const description = form.description.value;
+  const final_price = parseFloat(form.final_price.value);
+  const percentage_discount = parseInt(form.percentage_discount.value) || 0;
+  const published = form.published.checked;
 
-if (originalVideoURL) { const video = document.createElement('video'); video.src = originalVideoURL; video.controls = true; previewContent.appendChild(video); }
+  let imageFile = form.image.files[0];
+  let videoFile = form.video.files[0];
 
-const closeBtn = document.createElement('button'); closeBtn.textContent = 'Close Preview'; closeBtn.onclick = () => previewModal.style.display = 'none'; previewContent.appendChild(closeBtn);
+  let image_url = originalImageUrl;
+  let video_url = originalVideoUrl;
 
-previewModal.style.display = 'flex'; };
+  if (imageFile) {
+    const { data, error } = await supabase.storage
+      .from('media')
+      .upload(`images/${Date.now()}_${imageFile.name}`, imageFile, { upsert: true });
+    if (data) {
+      const { publicURL } = supabase.storage.from('media').getPublicUrl(data.path);
+      image_url = publicURL;
+    }
+  }
 
-previewBtn.addEventListener('click', showPreviewModal);
+  if (videoFile) {
+    const { data, error } = await supabase.storage
+      .from('media')
+      .upload(`videos/${Date.now()}_${videoFile.name}`, videoFile, { upsert: true });
+    if (data) {
+      const { publicURL } = supabase.storage.from('media').getPublicUrl(data.path);
+      video_url = publicURL;
+    }
+  }
 
-form.addEventListener('submit', async (e) => { e.preventDefault();
+  const payload = {
+    name,
+    description,
+    final_price,
+    percentage_discount,
+    image_url,
+    video_url,
+    published,
+  };
 
-const product = { name: nameInput.value, category: categoryInput.value, tags: tagsInput.value.split(',').map(tag => tag.trim()), price: parseFloat(priceInput.value), discount: parseFloat(discountInput.value) || 0, description: quill.root.innerHTML, published: publishedInput.checked, images: originalImageURLs, video: originalVideoURL };
+  let result;
 
-if (imageInput.files.length > 0) { // upload new images product.images = []; for (const file of imageInput.files) { const { data, error } = await supabase.storage.from('products').upload(images/${Date.now()}-${file.name}, file); if (data) { const url = supabase.storage.from('products').getPublicUrl(data.path).data.publicUrl; product.images.push(url); } } }
+  if (editingProductId) {
+    result = await supabase
+      .from('products')
+      .update(payload)
+      .eq('id', editingProductId);
+  } else {
+    result = await supabase
+      .from('products')
+      .insert(payload);
+  }
 
-if (videoInput.files.length > 0) { const file = videoInput.files[0]; const { data, error } = await supabase.storage.from('products').upload(videos/${Date.now()}-${file.name}, file); if (data) { product.video = supabase.storage.from('products').getPublicUrl(data.path).data.publicUrl; } }
+  if (result.error) {
+    alert('Error saving product');
+    console.error(result.error);
+  } else {
+    alert(editingProductId ? 'Product updated!' : 'Product added!');
+    editingProductId = null;
+    originalImageUrl = null;
+    originalVideoUrl = null;
+    form.reset();
+    await fetchAndRenderProducts();
+  }
+});
 
-if (editingId) { const { error } = await supabase.from('products').update(product).eq('id', editingId); if (!error) log(✔ Product updated.); } else { const { error } = await supabase.from('products').insert(product); if (!error) log(✔ Product created.); }
+// Edit product function
+function editProduct(product) {
+  const form = document.getElementById('productForm');
 
-resetForm(); loadProducts(); });
+  form.name.value = product.name;
+  form.description.value = product.description;
+  form.final_price.value = product.final_price;
+  form.percentage_discount.value = product.percentage_discount || '';
+  form.published.checked = product.published;
 
-const editProduct = (data) => { editingId = data.id; nameInput.value = data.name; categoryInput.value = data.category; tagsInput.value = data.tags.join(', '); priceInput.value = data.price; discountInput.value = data.discount; publishedInput.checked = data.published; quill.root.innerHTML = data.description;
+  originalImageUrl = product.image_url;
+  originalVideoUrl = product.video_url;
+  editingProductId = product.id;
 
-originalImageURLs = data.images || []; originalVideoURL = data.video || null;
+  window.scrollTo(0, 0);
+}
 
-renderImagePreviews(originalImageURLs); renderVideoPreview(originalVideoURL);
+// Preview product modal
+function previewProduct(product) {
+  const modal = document.getElementById('previewModal');
+  const content = document.getElementById('previewContent');
 
-submitBtn.textContent = '💾 Update Product'; window.scrollTo(0, 0); };
+  content.innerHTML = `
+    <h2>${product.name}</h2>
+    <p>${product.description}</p>
+    <p><strong>Product #:</strong> LYG-${String(product.product_number).padStart(3, '0')}</p>
+    <p><strong>Price:</strong> ₦${product.final_price}</p>
+    ${product.percentage_discount ? `<p><del>₦${calculateOriginalPrice(product.final_price, product.percentage_discount)}</del> <span>(${product.percentage_discount}% OFF)</span></p>` : ''}
+    ${product.image_url ? `<img src="${product.image_url}" class="preview-img" alt="Product Image">` : ''}
+    ${product.video_url ? `<video src="${product.video_url}" controls class="preview-video"></video>` : ''}
+    <p>Status: ${product.published ? '✅ Published' : '❌ Unpublished'}</p>
+    <button onclick="document.getElementById('previewModal').style.display='none'">Close</button>
+  `;
+  modal.style.display = 'block';
+}
 
-const loadProducts = async () => { const { data, error } = await supabase.from('products').select('*').order('product_number', { ascending: false }); tableBody.innerHTML = ''; data.forEach(product => { const row = document.createElement('tr'); row.innerHTML = <td>${product.product_number || ''}</td> <td><img src="${(product.images && product.images[0]) || ''}" class="thumbnail-img"></td> <td>${product.name}</td> <td>${product.category}</td> <td>₦${product.price}</td> <td>${product.published ? 'Published' : 'Unpublished'}</td> <td> <button onclick='editProduct(${JSON.stringify(product)})'>✏️</button> </td>; tableBody.appendChild(row); }); };
-
-loadProducts();
-
-                                                                                                            
+// Optional: click outside to close modal
+window.onclick = function (event) {
+  const modal = document.getElementById('previewModal');
+  if (event.target == modal) {
+    modal.style.display = 'none';
+  }
+};
