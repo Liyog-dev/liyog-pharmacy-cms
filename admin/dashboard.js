@@ -1,170 +1,48 @@
-// 🌐 Global Elements
-const form = document.getElementById("product-form");
-const nameInput = document.getElementById("name");
-const categoryInput = document.getElementById("category");
-const tagsInput = document.getElementById("tags");
-const priceInput = document.getElementById("price");
-const imagesInput = document.getElementById("images");
-const videoInput = document.getElementById("video");
-const previewContainer = document.getElementById("image-preview");
-const productTable = document.getElementById("product-table-body");
-const discountInput = document.getElementById("discount"); // optional field
-const quill = new Quill("#editor", { theme: "snow" });
+// ======================= // dashboard.js // =======================
 
-// 🧠 Logging Panel
-const log = (msg) => {
-  document.getElementById("log-panel").innerHTML += `> ${msg}<br/>`;
-};
 
-// ☁️ Uploading Files to Supabase
-async function uploadFile(file, bucket) {
-  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
-  const { error } = await client.storage.from(bucket).upload(uniqueId, file, {
-    cacheControl: '3600',
-    upsert: false
-  });
-  if (error) {
-    log(`❌ Upload error: ${error.message}`);
-    throw error;
-  }
-  const { data } = client.storage.from(bucket).getPublicUrl(uniqueId);
-  return data.publicUrl;
-}
+let currentPage = 1; let itemsPerPage = 10; let allProducts = [];
 
-// 🔄 Load Static Categories
-async function fetchCategories() {
-  const defaultCategories = [
-    "Pain Relief", "Antibiotics", "Skincare", "Cough Syrups", "Tablets", "Injections"
-  ];
-  categoryInput.innerHTML += defaultCategories.map(c => `<option value="${c}">${c}</option>`).join("");
-}
+// Fetch products from Supabase 
+document.addEventListener('DOMContentLoaded', async () => { await loadProducts(); setupSearch(); });
 
-// 🧾 Form Submit (Product Save)
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function loadProducts() { const { data, error } = await supabase.from('products').select('*').order('id', { ascending: false });
 
-  const name = nameInput.value.trim();
-  const category = categoryInput.value;
-  const tags = tagsInput.value.trim();
-  const price = parseFloat(priceInput.value);
-  const discount = discountInput?.value ? parseFloat(discountInput.value) : null;
-  const description = quill.root.innerHTML.trim();
-  const imageFiles = Array.from(imagesInput.files);
-  const videoFile = videoInput.files[0];
+if (error) { console.error('Error fetching products:', error); return; }
 
-  if (!name || !category || !price || imageFiles.length === 0) {
-    alert("Please fill all required fields and upload at least one image.");
-    return;
-  }
+allProducts = data; displayProducts(); }
 
-  // 🖼 Uploading Images
-  const imageUrls = [];
-  for (let file of imageFiles) {
-    try {
-      const url = await uploadFile(file, "product-images");
-      imageUrls.push(url);
-      log(`✅ Uploaded image: ${file.name}`);
-    } catch (err) {
-      log(`❌ Image upload failed: ${file.name}`);
-      return;
-    }
-  }
+function displayProducts() { const start = (currentPage - 1) * itemsPerPage; const end = start + itemsPerPage; const paginatedItems = allProducts.slice(start, end);
 
-  // 🎞 Uploading Video
-  let videoUrl = "";
-  if (videoFile) {
-    try {
-      videoUrl = await uploadFile(videoFile, "product-videos");
-      log(`🎞 Uploaded video: ${videoFile.name}`);
-    } catch (err) {
-      log(`❌ Video upload failed: ${videoFile.name}`);
-    }
-  }
+const productTableBody = document.getElementById('productTableBody'); productTableBody.innerHTML = '';
 
-  // ✅ Saving to Supabase
-  const { error } = await client.from("products").insert([{
-    name,
-    category,
-    tags,
-    price,
-    discount_percent: discount,
-    description_html: description,
-    image_urls: imageUrls,
-    video_url: videoUrl,
-    published: true  // default publish for now
-  }]);
+paginatedItems.forEach(product => { const row = document.createElement('tr'); row.innerHTML = <td>${product.product_number || '-'}</td> <td>${product.name}</td> <td> ${product.discount_percent ? <span style="text-decoration:line-through; color:red">₦${calculateOriginalPrice(product.price, product.discount_percent)}</span> <br><strong>₦${product.price}</strong> <br><span class="text-green-600">${product.discount_percent}% OFF</span>:₦${product.price}} </td> <td><img src="${product.thumbnail_url || '#'}" class="h-10 w-10 rounded"/></td> <td>${product.published ? '✅' : '❌'}</td> <td> <button class="btn-edit" onclick="openEditModal(${product.id})">✏️</button> <button class="btn-delete" onclick="deleteProduct(${product.id})">🗑️</button> </td> ; productTableBody.appendChild(row); });
 
-  if (error) {
-    log(`❌ DB Error: ${error.message}`);
-    alert("Failed to upload product.");
-  } else {
-    log("✅ Product saved!");
-    alert("Product uploaded successfully!");
-    form.reset();
-    quill.setContents([]);
-    previewContainer.innerHTML = "";
-    loadProducts();
-  }
-});
+renderPagination(); }
 
-// 📷 Preview Image
-imagesInput.addEventListener("change", () => {
-  previewContainer.innerHTML = "";
-  [...imagesInput.files].forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.createElement("img");
-      img.src = e.target.result;
-      img.className = "preview-img";
-      previewContainer.appendChild(img);
-    };
-    reader.readAsDataURL(file);
-  });
-});
+function calculateOriginalPrice(finalPrice, discountPercent) { const discount = parseFloat(discountPercent); const price = parseFloat(finalPrice); return Math.round((price / (1 - discount / 100))); }
 
-// 📥 Load Products into Table
-async function loadProducts() {
-  const { data, error } = await client
-    .from("products")
-    .select("id, name, category, price, product_number, discount_percent");
+function renderPagination() { const totalPages = Math.ceil(allProducts.length / itemsPerPage); const pagination = document.getElementById('pagination'); pagination.innerHTML = '';
 
-  if (data) {
-    productTable.innerHTML = data.map(p => `
-      <tr>
-        <td>#${p.product_number || "—"}</td>
-        <td>${p.name}</td>
-        <td>${p.category}</td>
-        <td>
-          ${p.discount_percent ? `
-            <s>₦${p.price}</s> 
-            <strong>(${p.discount_percent}% OFF)</strong>
-          ` : `₦${p.price}`}
-        </td>
-        <td>
-          <button onclick="editProduct('${p.id}')">✏️ Edit</button>
-          <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
-        </td>
-      </tr>
-    `).join("");
-  }
-}
+for (let i = 1; i <= totalPages; i++) { const btn = document.createElement('button'); btn.innerText = i; btn.className = i === currentPage ? 'bg-green-500 text-white px-3 py-1 mx-1 rounded' : 'bg-gray-300 px-3 py-1 mx-1 rounded'; btn.onclick = () => { currentPage = i; displayProducts(); }; pagination.appendChild(btn); } }
 
-// 🧹 Delete Product
-async function deleteProduct(id) {
-  const { error } = await client.from("products").delete().eq("id", id);
-  if (error) {
-    alert("❌ Failed to delete");
-  } else {
-    alert("🗑 Product deleted");
-    loadProducts();
-  }
-}
+function setupSearch() { const searchInput = document.getElementById('searchInput'); searchInput.addEventListener('input', () => { const keyword = searchInput.value.toLowerCase(); const filtered = allProducts.filter(product => product.name.toLowerCase().includes(keyword) || (product.product_number + '').includes(keyword) ); currentPage = 1; allProducts = filtered; displayProducts(); }); }
 
-// ✏️ Edit Hook (To be implemented)
-function editProduct(id) {
-  alert("🧪 Edit mode coming soon for product ID: " + id);
-}
+async function deleteProduct(productId) { if (!confirm('Are you sure you want to delete this product?')) return;
 
-// 🧭 Load Initial Data
-fetchCategories();
-loadProducts();
+const { error } = await supabase.from('products').delete().eq('id', productId); if (error) { alert('Error deleting product'); console.error(error); } else { alert('Product deleted'); await loadProducts(); } }
+
+// ====================== // Edit Modal Logic // ======================
+
+let currentEditId = null;
+
+function openEditModal(productId) { const product = allProducts.find(p => p.id === productId); if (!product) return;
+
+currentEditId = productId; document.getElementById('edit-name').value = product.name; document.getElementById('edit-price').value = product.price; document.getElementById('edit-thumbnail').value = product.thumbnail_url || ''; document.getElementById('edit-discount').value = product.discount_percent || ''; document.getElementById('edit-published').checked = product.published || false; document.getElementById('edit-modal').classList.remove('hidden'); }
+
+document.getElementById('edit-close').onclick = () => { document.getElementById('edit-modal').classList.add('hidden'); currentEditId = null; };
+
+document.getElementById('edit-save').onclick = async () => { const updatedData = { name: document.getElementById('edit-name').value, price: parseFloat(document.getElementById('edit-price').value), thumbnail_url: document.getElementById('edit-thumbnail').value, discount_percent: document.getElementById('edit-discount').value || null, published: document.getElementById('edit-published').checked, };
+
+const { error } = await supabase.from('products').update(updatedData).eq('id', currentEditId); if (error) { alert('Error updating product'); console.error(error); } else { alert('Product updated successfully'); document.getElementById('edit-modal').classList.add('hidden'); currentEditId = null; await loadProducts(); } };
+
