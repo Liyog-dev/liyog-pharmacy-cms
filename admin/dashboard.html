@@ -12,6 +12,8 @@
       font-family: sans-serif;
       background: #f8f8f8;
       padding: 20px;
+      max-width: 1000px;
+      margin: auto;
     }
     h1, h2 {
       color: #006400;
@@ -24,7 +26,7 @@
       font-weight: bold;
       margin-bottom: 5px;
     }
-    input, select, button {
+    input, select, button, textarea {
       width: 100%;
       padding: 10px;
       font-size: 14px;
@@ -89,9 +91,10 @@
       overflow-y: auto;
       max-height: 90vh;
     }
-    #preview-modal img, video {
+    #preview-modal img, #preview-modal video {
       max-width: 100%;
       border-radius: 5px;
+      margin-top: 10px;
     }
     #preview-modal button {
       margin-top: 20px;
@@ -101,11 +104,41 @@
       display: flex;
       gap: 10px;
       margin-bottom: 10px;
+      flex-wrap: wrap;
     }
     .switch {
       display: flex;
       align-items: center;
       gap: 5px;
+    }
+    @media (max-width: 600px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+      thead tr {
+        display: none;
+      }
+      td {
+        position: relative;
+        padding-left: 50%;
+        border: none;
+        border-bottom: 1px solid #ccc;
+      }
+      td::before {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 45%;
+        white-space: nowrap;
+        font-weight: bold;
+      }
+      td:nth-child(1)::before { content: "#ID"; }
+      td:nth-child(2)::before { content: "Thumbnail"; }
+      td:nth-child(3)::before { content: "Name"; }
+      td:nth-child(4)::before { content: "Category"; }
+      td:nth-child(5)::before { content: "Price"; }
+      td:nth-child(6)::before { content: "Status"; }
+      td:nth-child(7)::before { content: "Actions"; }
     }
   </style>
 </head>
@@ -167,7 +200,7 @@
     </div>
 
     <div class="form-group">
-      <button type="submit">💾 Save Product</button>
+      <button type="submit" id="submit-btn">💾 Save Product</button>
     </div>
   </form>
 
@@ -190,7 +223,7 @@
     <table>
       <thead>
         <tr>
-          <th>#ID</th>
+          <th>#No.</th>
           <th>Thumbnail</th>
           <th>Name</th>
           <th>Category</th>
@@ -213,4 +246,5 @@
   <script src="config.js"></script>
   <script src="dashboard.js"></script>
 </body>
-</html>
+  </html>
+  
