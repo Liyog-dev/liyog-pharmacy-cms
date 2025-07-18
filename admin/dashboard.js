@@ -196,7 +196,14 @@ async function loadProducts(page = 1) {
   productTable.innerHTML = data.map(p => `
     <tr>
       <td>#${p.product_number || p.id}</td>
-      <td><img src="${p.image_urls?.[0] || ""}" class="thumbnail-img"/></td>
+      <td>
+  <img 
+    src="${p.image_urls?.[0] || 'https://cdn-icons-png.flaticon.com/512/2965/2965567.png'}" 
+    alt="${p.name}" 
+    class="thumbnail-img"
+    style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px;"
+  />
+</td>
       <td>${p.name}</td>
       <td>${p.category}</td>
       <td>
@@ -229,3 +236,5 @@ filterCategory.addEventListener("change", () => loadProducts(1));
 // 🚀 Boot
 fetchCategories();
 loadProducts();
+
+    
