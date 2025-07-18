@@ -1,4 +1,5 @@
 // 🌐 Global Elements
+const youtubeInput = document.getElementById("youtube");
 const form = document.getElementById("product-form");
 const nameInput = document.getElementById("name");
 const categoryInput = document.getElementById("category");
@@ -70,10 +71,20 @@ form.addEventListener("submit", async (e) => {
   }
 
   let videoUrl = "";
-  if (videoFile) {
-    videoUrl = await uploadFile(videoFile, "product-videos");
-    log(`🎞 Uploaded video: ${videoFile.name}`);
+if (videoFile) {
+  videoUrl = await uploadFile(videoFile, "product-videos");
+  log(`🎞 Uploaded video: ${videoFile.name}`);
+} else if (youtubeInput.value.trim()) {
+  const ytValue = youtubeInput.value.trim();
+  if (ytValue.includes("youtube.com") || ytValue.includes("youtu.be")) {
+    // Convert share link to embed if necessary
+    const embedUrl = ytValue.includes("embed")
+      ? ytValue
+      : ytValue.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+    videoUrl = embedUrl;
+    log(`🔗 YouTube embed video used: ${embedUrl}`);
   }
+}
 
   const productData = {
     name,
@@ -105,6 +116,7 @@ form.addEventListener("submit", async (e) => {
     quill.setContents([]);
     previewContainer.innerHTML = "";
     loadProducts();
+youtubeInput.value = "";
   }
 });
 
@@ -134,7 +146,13 @@ previewBtn.addEventListener("click", () => {
     return `<img src="${URL.createObjectURL(file)}" style="max-width:100px;margin:5px;" />`;
   }).join("");
 
-  const videoHTML = videoInput.files[0] ? `<video controls width="200"><source src="${URL.createObjectURL(videoInput.files[0])}" /></video>` : "";
+  let videoHTML = "";
+if (videoInput.files[0]) {
+  videoHTML = `<video controls width="200"><source src="${URL.createObjectURL(videoInput.files[0])}" /></video>`;
+} else if (youtubeInput.value.trim()) {
+  const yt = youtubeInput.value.trim().replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+  videoHTML = `<iframe width="300" height="200" src="${yt}" frameborder="0" allowfullscreen></iframe>`;
+}
 
   previewContent.innerHTML = `
     <h2>${name}</h2>
@@ -163,7 +181,13 @@ async function editProduct(id) {
   quill.root.innerHTML = data.description_html || "";
   publishedInput.checked = data.published;
   alert("✏️ Product loaded for editing. Click Save to update.");
+
+if (data.video_url?.includes("youtube.com")) {
+  youtubeInput.value = data.video_url;
 }
+
+}
+
 
 // 🧹 Delete Product
 async function deleteProduct(id) {
@@ -237,4 +261,4 @@ filterCategory.addEventListener("change", () => loadProducts(1));
 fetchCategories();
 loadProducts();
 
-    
+
