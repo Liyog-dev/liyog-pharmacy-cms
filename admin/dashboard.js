@@ -169,59 +169,51 @@ if (videoInput.files[0]) {
 
 // ✏️ Edit Product
 async function editProduct(id) {
-  try {
-    const { data, error } = await client.from("products").select("*").eq("id", id).single();
-    if (error || !data) {
-      alert("❌ Failed to load product for editing.");
-      return;
-    }
+  const { data, error } = await client.from("products").select("*").eq("id", id).single();
+  if (error || !data) return alert("❌ Failed to load product for editing.");
 
-    editingProductId = id;
+  editingProductId = id;
 
-    // Prefill input fields
-    nameInput.value = data.name || "";
-    categoryInput.value = data.category || "";
-    tagsInput.value = data.tags || "";
-    priceInput.value = data.price || "";
-    discountInput.value = data.discount_percent || "";
-    quill.root.innerHTML = data.description_html || "";
-    publishedInput.checked = data.published || false;
+  // Pre-fill fields
+  nameInput.value = data.name;
+  categoryInput.value = data.category;
+  tagsInput.value = data.tags || "";
+  priceInput.value = data.price;
+  discountInput.value = data.discount_percent || "";
+  quill.root.innerHTML = data.description_html || "";
+  publishedInput.checked = !!data.published;
 
-    // Prefill video fields
-    if (data.video_url?.includes("youtube.com")) {
-      youtubeInput.value = data.video_url;
-      videoInput.value = ""; // Clear file input if using YouTube
-    } else if (data.video_url) {
-      // Assume it's a file-based upload
-      youtubeInput.value = "";
-      videoPreview.innerHTML = `<video src="${data.video_url}" controls style="width:100%;max-height:200px;"></video>`;
-    } else {
-      youtubeInput.value = "";
-      videoPreview.innerHTML = "";
-    }
-
-    // Prefill image(s)
-    if (Array.isArray(data.image_urls) && data.image_urls.length > 0) {
-      imagePreview.innerHTML = data.image_urls.map(url => `
-        <img src="${url}" alt="Uploaded Image" style="width: 100px; margin: 5px; border-radius: 5px;" />
-      `).join("");
-    } else {
-      imagePreview.innerHTML = "";
-    }
-
-    // Scroll to form
-    const formSection = document.getElementById("productForm") || document.querySelector("form");
-    if (formSection) {
-      formSection.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    alert("✏️ Product loaded for editing. Review and click Save to update.");
-  } catch (err) {
-    console.error(err);
-    alert("❌ Unexpected error occurred while editing product.");
+  // Handle video and YouTube input
+  const youtubeInput = document.getElementById("youtube");
+  const videoInput = document.getElementById("video");
+  if (data.video_url?.includes("youtube.com") || data.video_url?.includes("youtu.be")) {
+    youtubeInput.value = data.video_url;
+  } else {
+    youtubeInput.value = "";
   }
-}
 
+  // Clear and re-render image previews
+  const imagePreviewContainer = document.getElementById("image-preview");
+  imagePreviewContainer.innerHTML = "";
+  if (data.image_urls?.length) {
+    data.image_urls.forEach(url => {
+      const img = document.createElement("img");
+      img.src = url;
+      img.className = "preview-img";
+      imagePreviewContainer.appendChild(img);
+    });
+  }
+
+  // Optional: store image/video URLs for edit use
+  selectedImageURLs = data.image_urls || [];
+  selectedVideoURL = data.video_url || "";
+
+  // Scroll to top of form
+  const form = document.getElementById("product-form");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  log("✏️ Product loaded for editing. Make changes and click Save to update.");
+}
 
 // 🧹 Delete Product
 async function deleteProduct(id) {
@@ -297,4 +289,4 @@ loadProducts();
 
     
 
-  
+    
