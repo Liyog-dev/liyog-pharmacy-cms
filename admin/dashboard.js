@@ -169,23 +169,57 @@ if (videoInput.files[0]) {
 
 // ✏️ Edit Product
 async function editProduct(id) {
-  const { data, error } = await client.from("products").select("*").eq("id", id).single();
-  if (error) return alert("❌ Failed to load product for editing.");
+  try {
+    const { data, error } = await client.from("products").select("*").eq("id", id).single();
+    if (error || !data) {
+      alert("❌ Failed to load product for editing.");
+      return;
+    }
 
-  editingProductId = id;
-  nameInput.value = data.name;
-  categoryInput.value = data.category;
-  tagsInput.value = data.tags || "";
-  priceInput.value = data.price;
-  discountInput.value = data.discount_percent || "";
-  quill.root.innerHTML = data.description_html || "";
-  publishedInput.checked = data.published;
-  alert("✏️ Product loaded for editing. Click Save to update.");
+    editingProductId = id;
 
-if (data.video_url?.includes("youtube.com")) {
-  youtubeInput.value = data.video_url;
-}
+    // Prefill input fields
+    nameInput.value = data.name || "";
+    categoryInput.value = data.category || "";
+    tagsInput.value = data.tags || "";
+    priceInput.value = data.price || "";
+    discountInput.value = data.discount_percent || "";
+    quill.root.innerHTML = data.description_html || "";
+    publishedInput.checked = data.published || false;
 
+    // Prefill video fields
+    if (data.video_url?.includes("youtube.com")) {
+      youtubeInput.value = data.video_url;
+      videoInput.value = ""; // Clear file input if using YouTube
+    } else if (data.video_url) {
+      // Assume it's a file-based upload
+      youtubeInput.value = "";
+      videoPreview.innerHTML = `<video src="${data.video_url}" controls style="width:100%;max-height:200px;"></video>`;
+    } else {
+      youtubeInput.value = "";
+      videoPreview.innerHTML = "";
+    }
+
+    // Prefill image(s)
+    if (Array.isArray(data.image_urls) && data.image_urls.length > 0) {
+      imagePreview.innerHTML = data.image_urls.map(url => `
+        <img src="${url}" alt="Uploaded Image" style="width: 100px; margin: 5px; border-radius: 5px;" />
+      `).join("");
+    } else {
+      imagePreview.innerHTML = "";
+    }
+
+    // Scroll to form
+    const formSection = document.getElementById("productForm") || document.querySelector("form");
+    if (formSection) {
+      formSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    alert("✏️ Product loaded for editing. Review and click Save to update.");
+  } catch (err) {
+    console.error(err);
+    alert("❌ Unexpected error occurred while editing product.");
+  }
 }
 
 
@@ -261,4 +295,6 @@ filterCategory.addEventListener("change", () => loadProducts(1));
 fetchCategories();
 loadProducts();
 
+    
 
+  
