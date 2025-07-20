@@ -47,7 +47,7 @@ const cat = categoryFilter.value;
 const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
 const paginated = filtered.slice(start, start + PRODUCTS_PER_PAGE);
 
-tableBody.innerHTML = paginated.map(p => `
+tableBody.innerHTML = paginated.map(p => 
   <tr>
     <td>${p.id}</td>
     <td><img src="${p.image1 || ''}" class="thumbnail-img" width="40" /></td>
