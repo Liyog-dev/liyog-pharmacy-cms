@@ -1,3 +1,7 @@
+// 📦 Initialize Supabase
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // 🌐 Global Elements
 const form = document.getElementById("product-form");
 const nameInput = document.getElementById("name");
