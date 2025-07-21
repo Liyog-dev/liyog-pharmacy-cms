@@ -1,208 +1,241 @@
-// ✅ UPGRADED DASHBOARD.JS — Liyog Pharmacy CMS (Product Upload)
+// 🌐 Global Elements
+const form = document.getElementById("product-form");
+const nameInput = document.getElementById("name");
+const categoryInput = document.getElementById("category");
+const tagsInput = document.getElementById("tags");
+const priceInput = document.getElementById("price");
+const discountInput = document.getElementById("discount");
+const imagesInput = document.getElementById("images");
+const videoInput = document.getElementById("video");
+const publishedInput = document.getElementById("published");
+const previewContainer = document.getElementById("image-preview");
+const productTable = document.getElementById("product-table-body");
+const previewBtn = document.getElementById("preview-btn");
+const previewModal = document.getElementById("preview-modal");
+const previewContent = document.getElementById("preview-content");
+const searchInput = document.getElementById("search");
+const filterCategory = document.getElementById("filter-category");
+const pagination = document.getElementById("pagination");
 
-// ⬛ CONFIG IMPORT
-import { supabase } from './config.js';
+const quill = new Quill("#editor", { theme: "snow" });
+let currentPage = 1;
+const pageSize = 5;
+let editingProductId = null; // 🔁 Track whether we're editing or inserting
 
-// 🔁 Global State
-let currentEditId = null;
-let allProducts = [];
+const log = (msg) => {
+  document.getElementById("log-panel").innerHTML += `> ${msg}<br/>`;
+};
 
-// 🧱 DOM Elements
-const form = document.getElementById('productForm');
-const nameInput = document.getElementById('productName');
-const categorySelect = document.getElementById('category');
-const tagsInput = document.getElementById('tags');
-const priceInput = document.getElementById('price');
-const discountInput = document.getElementById('discount');
-const cartonQtyInput = document.getElementById('cartonQty');
-const descriptionInput = document.getElementById('description');
-const imageInput = document.getElementById('images');
-const videoFileInput = document.getElementById('videoFile');
-const youtubeInput = document.getElementById('youtube');
-const previewContainer = document.getElementById('preview');
-const productTable = document.getElementById('productTable');
-const saveBtn = document.getElementById('saveBtn');
-const statusToggle = document.getElementById('publishStatus');
-
-// 🔃 Load Categories
-async function loadCategories() {
-  const { data, error } = await supabase.from('categories').select('*');
-  if (error) return alert('Error loading categories');
-  categorySelect.innerHTML = data.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('');
+async function uploadFile(file, bucket) {
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
+  const { error } = await client.storage.from(bucket).upload(uniqueId, file, {
+    cacheControl: '3600',
+    upsert: false
+  });
+  if (error) throw error;
+  const { data } = client.storage.from(bucket).getPublicUrl(uniqueId);
+  return data.publicUrl;
 }
 
-// 🧠 Auto Calculate Price per Carton
-function updateCartonPrice() {
-  const unitPrice = parseFloat(priceInput.value) || 0;
-  const qty = parseInt(cartonQtyInput.value) || 0;
-  const discount = parseFloat(discountInput.value) || 0;
-  const total = (unitPrice * qty) * ((100 - discount) / 100);
-  document.getElementById('cartonPrice').textContent = `₦${total.toFixed(2)}`;
+async function fetchCategories() {
+  const categories = ["Pain Relief", "Antibiotics", "Skincare", "Cough Syrups", "Tablets", "Injections"];
+  categoryInput.innerHTML += categories.map(c => `<option value="${c}">${c}</option>`).join("");
+  filterCategory.innerHTML += categories.map(c => `<option value="${c}">${c}</option>`).join("");
 }
 
-// 🔁 Listen for auto calc
-[priceInput, discountInput, cartonQtyInput].forEach(input => input.addEventListener('input', updateCartonPrice));
-
-// 📺 Live Preview
-function updatePreview() {
-  const images = imageInput.files;
-  const name = nameInput.value;
-  const desc = descriptionInput.value;
-  const videoURL = youtubeInput.value || (videoFileInput.files[0] ? URL.createObjectURL(videoFileInput.files[0]) : '');
-  
-  let previewHTML = `<h3>${name}</h3><p>${desc}</p>`;
-  if (images.length > 0) {
-    Array.from(images).forEach(file => {
-      const url = URL.createObjectURL(file);
-      previewHTML += `<img src="${url}" width="100">`;
-    });
-  }
-  if (videoURL) {
-    if (youtubeInput.value) {
-      previewHTML += `<iframe width="300" height="200" src="https://www.youtube.com/embed/${extractYouTubeId(videoURL)}"></iframe>`;
-    } else {
-      previewHTML += `<video src="${videoURL}" width="300" controls></video>`;
-    }
-  }
-  previewContainer.innerHTML = previewHTML;
-}
-
-imageInput.addEventListener('change', updatePreview);
-youtubeInput.addEventListener('input', updatePreview);
-videoFileInput.addEventListener('change', updatePreview);
-descriptionInput.addEventListener('input', updatePreview);
-
-function extractYouTubeId(url) {
-  const match = url.match(/(?:youtube\.com.*(?:\?|&)v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : '';
-}
-
-// 📦 Submit Product
-form.addEventListener('submit', async (e) => {
+// 💾 Save or Update Product
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving...';
 
   const name = nameInput.value.trim();
-  const category = categorySelect.value;
+  const category = categoryInput.value;
   const tags = tagsInput.value.trim();
   const price = parseFloat(priceInput.value);
-  const discount = parseFloat(discountInput.value);
-  const qty = parseInt(cartonQtyInput.value);
-  const desc = descriptionInput.value.trim();
-  const status = statusToggle.checked ? 'published' : 'draft';
-  const id = currentEditId ?? Date.now();
+  const discount = discountInput?.value ? parseFloat(discountInput.value) : null;
+  const description = quill.root.innerHTML.trim();
+  const imageFiles = Array.from(imagesInput.files);
+  const videoFile = videoInput.files[0];
+  const published = publishedInput.checked;
 
-  // Upload images
-  const imageFiles = imageInput.files;
-  let imageUrls = [];
+  if (!name || !category || !price) {
+    alert("Please fill all required fields.");
+    return;
+  }
+
+  const imageUrls = [];
   for (let file of imageFiles) {
-    const { data, error } = await supabase.storage.from('product-images').upload(`product-${id}/${file.name}`, file, { upsert: true });
-    if (!error) {
-      const url = supabase.storage.from('product-images').getPublicUrl(data.path).data.publicUrl;
-      imageUrls.push(url);
-    }
+    const url = await uploadFile(file, "product-images");
+    imageUrls.push(url);
+    log(`✅ Uploaded image: ${file.name}`);
   }
 
-  // Upload video if provided
-  let videoUrl = '';
-  if (videoFileInput.files[0]) {
-    const { data, error } = await supabase.storage.from('product-videos').upload(`product-${id}/${videoFileInput.files[0].name}`, videoFileInput.files[0], { upsert: true });
-    if (!error) {
-      videoUrl = supabase.storage.from('product-videos').getPublicUrl(data.path).data.publicUrl;
-    }
-  } else if (youtubeInput.value) {
-    videoUrl = youtubeInput.value;
+  let videoUrl = "";
+  if (videoFile) {
+    videoUrl = await uploadFile(videoFile, "product-videos");
+    log(`🎞 Uploaded video: ${videoFile.name}`);
   }
 
-  const product = {
-    id,
+  const productData = {
     name,
     category,
     tags,
     price,
-    discount,
-    carton_qty: qty,
-    description: desc,
-    images: imageUrls,
-    video: videoUrl,
-    status,
-    updated_at: new Date().toISOString()
+    discount_percent: discount,
+    description_html: description,
+    published,
+    ...(imageUrls.length > 0 && { image_urls: imageUrls }),
+    ...(videoUrl && { video_url: videoUrl })
   };
 
-  let result;
-  if (currentEditId) {
-    result = await supabase.from('products').update(product).eq('id', currentEditId);
+  let response;
+  if (editingProductId) {
+    response = await client.from("products").update(productData).eq("id", editingProductId);
   } else {
-    result = await supabase.from('products').insert([product]);
+    response = await client.from("products").insert([productData]);
   }
 
-  if (result.error) {
-    alert('Failed to save product');
+  if (response.error) {
+    log(`❌ DB Error: ${response.error.message}`);
+    alert("Failed to save product.");
   } else {
-    alert('Product saved successfully');
+    log(editingProductId ? "✅ Product updated!" : "✅ Product saved!");
+    alert(editingProductId ? "Product updated successfully!" : "Product uploaded successfully!");
+    editingProductId = null;
     form.reset();
-    previewContainer.innerHTML = '';
-    currentEditId = null;
+    quill.setContents([]);
+    previewContainer.innerHTML = "";
     loadProducts();
   }
-
-  saveBtn.disabled = false;
-  saveBtn.textContent = 'Save Product';
 });
 
-// 📝 Load Products
-async function loadProducts() {
-  const { data, error } = await supabase.from('products').select('*').order('updated_at', { ascending: false });
-  if (error) return alert('Error loading products');
-  allProducts = data;
-  renderProductTable();
+imagesInput.addEventListener("change", () => {
+  previewContainer.innerHTML = "";
+  [...imagesInput.files].forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement("img");
+      img.src = e.target.result;
+      img.className = "preview-img";
+      previewContainer.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+previewBtn.addEventListener("click", () => {
+  const name = nameInput.value;
+  const category = categoryInput.value;
+  const price = priceInput.value;
+  const discount = discountInput.value;
+  const published = publishedInput.checked;
+  const description = quill.root.innerHTML;
+
+  const imageHTML = [...imagesInput.files].map(file => {
+    return `<img src="${URL.createObjectURL(file)}" style="max-width:100px;margin:5px;" />`;
+  }).join("");
+
+  const videoHTML = videoInput.files[0] ? `<video controls width="200"><source src="${URL.createObjectURL(videoInput.files[0])}" /></video>` : "";
+
+  previewContent.innerHTML = `
+    <h2>${name}</h2>
+    <p><strong>Category:</strong> ${category}</p>
+    <p><strong>Price:</strong> ₦${price} ${discount ? `– ${discount}% off` : ""}</p>
+    <p><strong>Status:</strong> ${published ? "Published" : "Unpublished"}</p>
+    <div>${description}</div>
+    ${imageHTML}
+    ${videoHTML}
+    <button onclick="previewModal.style.display='none'">Close Preview</button>
+  `;
+  previewModal.style.display = "flex";
+});
+
+// ✏️ Edit Product
+async function editProduct(id) {
+  const { data, error } = await client.from("products").select("*").eq("id", id).single();
+  if (error) return alert("❌ Failed to load product for editing.");
+
+  editingProductId = id;
+  nameInput.value = data.name;
+  categoryInput.value = data.category;
+  tagsInput.value = data.tags || "";
+  priceInput.value = data.price;
+  discountInput.value = data.discount_percent || "";
+  quill.root.innerHTML = data.description_html || "";
+  publishedInput.checked = data.published;
+  alert("✏️ Product loaded for editing. Click Save to update.");
 }
 
-// 🔁 Render Table
-function renderProductTable() {
-  productTable.innerHTML = allProducts.map(p => `
+// 🧹 Delete Product
+async function deleteProduct(id) {
+  if (!confirm("Are you sure you want to delete this product?")) return;
+  const { error } = await client.from("products").delete().eq("id", id);
+  if (error) {
+    alert("❌ Failed to delete");
+  } else {
+    alert("🗑 Product deleted");
+    loadProducts();
+  }
+}
+
+// 📥 Load Products with Filters and Pagination
+async function loadProducts(page = 1) {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const search = searchInput.value.trim();
+  const category = filterCategory.value;
+
+  let query = client.from("products").select("*", { count: "exact" }).order("id", { ascending: false }).range(from, to);
+
+  if (search) query = query.ilike("name", `%${search}%`);
+  if (category) query = query.eq("category", category);
+
+  const { data, error, count } = await query;
+  if (error) return log("❌ Failed to load products");
+
+  productTable.innerHTML = data.map(p => `
     <tr>
-      <td>${p.id}</td>
-      <td><img src="${p.images?.[0]}" width="40"></td>
+      <td>#${p.product_number || p.id}</td>
+      <td>
+  <img 
+    src="${p.image_urls?.[0] || 'https://cdn-icons-png.flaticon.com/512/2965/2965567.png'}" 
+    alt="${p.name}" 
+    class="thumbnail-img"
+    style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px;"
+  />
+</td>
       <td>${p.name}</td>
       <td>${p.category}</td>
-      <td>₦${p.price}</td>
-      <td>${p.status}</td>
       <td>
-        <button onclick="editProduct(${p.id})">Edit</button>
-        <button onclick="deleteProduct(${p.id})">Delete</button>
+        ${p.discount_percent ? `
+          <s>₦${p.price}</s> 
+          <strong>₦${(p.price * (1 - p.discount_percent / 100)).toFixed(2)} (${p.discount_percent}% OFF)</strong>
+        ` : `₦${p.price}`}
       </td>
-    </tr>`).join('');
+      <td>${p.published ? "✅ Published" : "⛔ Unpublished"}</td>
+      <td>
+        <button onclick="editProduct('${p.id}')">✏️ Edit</button>
+        <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
+      </td>
+    </tr>
+  `).join("");
+
+  const totalPages = Math.ceil(count / pageSize);
+  pagination.innerHTML = `
+    ${page > 1 ? `<button onclick="loadProducts(${page - 1})">⬅ Prev</button>` : ""}
+    Page ${page} of ${totalPages}
+    ${page < totalPages ? `<button onclick="loadProducts(${page + 1})">Next ➡</button>` : ""}
+  `;
+  currentPage = page;
 }
 
-// ✏️ Edit Mode
-window.editProduct = async function (id) {
-  const { data } = await supabase.from('products').select('*').eq('id', id).single();
-  if (!data) return alert('Product not found');
-  nameInput.value = data.name;
-  categorySelect.value = data.category;
-  tagsInput.value = data.tags;
-  priceInput.value = data.price;
-  discountInput.value = data.discount;
-  cartonQtyInput.value = data.carton_qty;
-  descriptionInput.value = data.description;
-  youtubeInput.value = data.video.includes('youtube') ? data.video : '';
-  statusToggle.checked = data.status === 'published';
-  currentEditId = data.id;
-  updateCartonPrice();
-  updatePreview();
-}
+// 🔍 Filters
+searchInput.addEventListener("input", () => loadProducts(1));
+filterCategory.addEventListener("change", () => loadProducts(1));
 
-// ❌ Delete Product
-window.deleteProduct = async function (id) {
-  if (!confirm('Are you sure you want to delete this product?')) return;
-  const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) return alert('Delete failed');
-  loadProducts();
-}
-
-// 🚀 Init
-loadCategories();
+// 🚀 Boot
+fetchCategories();
 loadProducts();
+
+
     
