@@ -1,4 +1,4 @@
-// 📦 Initialize Supabase
+// 📦 Initialize Supabase details
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
