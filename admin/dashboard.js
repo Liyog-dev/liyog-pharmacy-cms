@@ -1,3 +1,6 @@
+// 📦 Initialize Supabase
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+
 
 // 🌐 Global Elements
 const form = document.getElementById("product-form");
