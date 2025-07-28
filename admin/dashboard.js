@@ -1,190 +1,361 @@
-// Liyog Pharmacy Admin Dashboard
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+// 📦 Final dashboard.js with full image/video edit support
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
+// 🌐 Global Elements
 const form = document.getElementById("product-form");
-const categorySelect = document.getElementById("category");
-const filterCategory = document.getElementById("filter-category");
-const productTableBody = document.getElementById("product-table-body");
-const logPanel = document.getElementById("log-panel");
+const nameInput = document.getElementById("name");
+const categoryInput = document.getElementById("category");
+const tagsInput = document.getElementById("tags");
+const priceInput = document.getElementById("price");
+const discountInput = document.getElementById("discount");
+const imagesInput = document.getElementById("images");
+const videoInput = document.getElementById("video");
+const youtubeInput = document.getElementById("youtube_url");
+const cartonQuantityInput = document.getElementById("carton_quantity");
+const publishedInput = document.getElementById("published");
+const previewContainer = document.getElementById("image-preview");
+const productTable = document.getElementById("product-table-body");
 const previewBtn = document.getElementById("preview-btn");
 const previewModal = document.getElementById("preview-modal");
 const previewContent = document.getElementById("preview-content");
-const imagePreview = document.getElementById("image-preview");
 const searchInput = document.getElementById("search");
+const filterCategory = document.getElementById("filter-category");
+const pagination = document.getElementById("pagination");
+const videoPreviewContainer = document.getElementById("video-preview") || document.createElement("div");
+const submitBtn = document.getElementById("submit-button");
 
 const quill = new Quill("#editor", { theme: "snow" });
+let currentPage = 1;
+const pageSize = 5;
+let editingProductId = null;
+let allImageItems = []; // { type: "existing" | "new", url?, file? }
+let existingVideoUrl = "";
 
-function log(msg) {
-  logPanel.innerHTML += `\n${msg}`;
-}
+const log = (msg) => {
+  document.getElementById("log-panel").innerHTML += `> ${msg}<br/>`;
+};
 
-function resetForm() {
-  form.reset();
-  quill.setContents([]);
-  imagePreview.innerHTML = "";
+const showToast = (message, type = "success") => {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  document.getElementById("toast-container").appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+};
+
+const showSpinner = (text = "Saving") => {
+  const spinnerOverlay = document.createElement("div");
+  spinnerOverlay.id = "spinner-overlay";
+  spinnerOverlay.style = `
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 10000;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    font-family: Arial; font-weight: bold;
+    font-size: 18px; color: green;
+  `;
+  spinnerOverlay.innerHTML = `
+    <div class="spinner"></div>
+    <div style="margin-top: 10px;">LiyoRix<br><small>${text}...</small></div>
+  `;
+  document.body.appendChild(spinnerOverlay);
+};
+
+const hideSpinner = () => {
+  const spinner = document.getElementById("spinner-overlay");
+  if (spinner) spinner.remove();
+};
+
+async function uploadFile(file, bucket) {
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
+  const { error } = await client.storage.from(bucket).upload(uniqueId, file, {
+    cacheControl: '3600',
+    upsert: false
+  });
+  if (error) throw error;
+  const { data } = client.storage.from(bucket).getPublicUrl(uniqueId);
+  return data.publicUrl;
 }
 
 async function fetchCategories() {
-  const { data, error } = await supabase.from("categories").select("id, name");
-  if (error) return log("❌ Error loading categories: " + error.message);
-  categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
-  filterCategory.innerHTML = '<option value="">-- All Categories --</option>';
-  data.forEach(cat => {
-    const option = `<option value="${cat.id}">${cat.name}</option>`;
-    categorySelect.innerHTML += option;
-    filterCategory.innerHTML += option;
+  const { data, error } = await client.from("categories").select("name");
+  if (error) return console.error("Failed to fetch categories", error);
+
+  categoryInput.innerHTML = '<option value="">Select Category</option>' +
+    data.map(c => `<option value="${c.name}">${c.name}</option>`).join("");
+  filterCategory.innerHTML = '<option value="">All Categories</option>' +
+    data.map(c => `<option value="${c.name}">${c.name}</option>`).join("");
+}
+
+
+function renderImagePreview() {
+  previewContainer.innerHTML = "";
+  allImageItems.forEach((item, index) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "preview-wrapper";
+    wrapper.setAttribute("draggable", true);
+
+    const img = document.createElement("img");
+    img.src = item.type === "existing" ? item.url : URL.createObjectURL(item.file);
+    img.className = "preview-img";
+
+    const removeBtn = document.createElement("div");
+    removeBtn.className = "remove-btn";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.addEventListener("click", () => {
+      allImageItems.splice(index, 1);
+      renderImagePreview();
+    });
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(removeBtn);
+    previewContainer.appendChild(wrapper);
+  });
+
+  // drag & drop
+  let dragged;
+  previewContainer.addEventListener("dragstart", (e) => {
+    dragged = e.target.closest(".preview-wrapper");
+  });
+
+  previewContainer.addEventListener("dragover", (e) => e.preventDefault());
+
+  previewContainer.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const target = e.target.closest(".preview-wrapper");
+    if (dragged && target && dragged !== target) {
+      const from = Array.from(previewContainer.children).indexOf(dragged);
+      const to = Array.from(previewContainer.children).indexOf(target);
+      const moved = allImageItems.splice(from, 1)[0];
+      allImageItems.splice(to, 0, moved);
+      renderImagePreview();
+    }
   });
 }
 
-function getImageUrls(files) {
-  return Promise.all(
-    [...files].map(async file => {
-      const { data, error } = await supabase.storage.from("product-images").upload(`products/${Date.now()}_${file.name}`, file);
-      if (error) throw error;
-      const { data: url } = supabase.storage.from("product-images").getPublicUrl(data.path);
-      return url.publicUrl;
-    })
-  );
-}
-
-async function uploadVideo(file) {
-  const { data, error } = await supabase.storage.from("product-videos").upload(`videos/${Date.now()}_${file.name}`, file);
-  if (error) throw error;
-  const { data: url } = supabase.storage.from("product-videos").getPublicUrl(data.path);
-  return url.publicUrl;
-}
-
-function renderPreview(product) {
-  previewContent.innerHTML = `
-    <h2>🧾 Preview Product</h2>
-    <p><strong>Name:</strong> ${product.name}</p>
-    <p><strong>Category:</strong> ${product.category}</p>
-    <p><strong>Tags:</strong> ${product.tags}</p>
-    <p><strong>Price:</strong> ₦${product.price}</p>
-    <p><strong>Discount:</strong> ${product.discount || "None"}%</p>
-    <p><strong>Carton Quantity:</strong> ${product.carton_quantity || "N/A"}</p>
-    <p><strong>Published:</strong> ${product.published ? "Yes" : "No"}</p>
-    <div><strong>Description:</strong> ${product.description}</div>
-    ${product.image_urls.map(url => `<img src="${url}" class="preview-img" />`).join('')}
-    ${product.video_url ? `<video controls src="${product.video_url}" style="max-width:100%;"></video>` : ''}
-    ${product.youtube_url ? `<iframe width="100%" height="315" src="${product.youtube_url}" frameborder="0" allowfullscreen></iframe>` : ''}
-  `;
-  previewModal.style.display = "flex";
-}
-
-function closeModal() {
-  previewModal.style.display = "none";
-}
-
-previewBtn.addEventListener("click", async () => {
-  const product = await extractFormData();
-  renderPreview(product);
+imagesInput.addEventListener("change", () => {
+  const newFiles = Array.from(imagesInput.files).map(file => ({ type: "new", file }));
+  allImageItems = [...allImageItems, ...newFiles];
+  renderImagePreview();
 });
-
-previewModal.addEventListener("click", (e) => {
-  if (e.target.id === "preview-modal") closeModal();
-});
-
-async function extractFormData() {
-  const name = document.getElementById("name").value;
-  const category = document.getElementById("category").value;
-  const tags = document.getElementById("tags").value;
-  const price = parseFloat(document.getElementById("price").value);
-  const discount = parseInt(document.getElementById("discount").value) || 0;
-  const description = quill.root.innerHTML;
-  const published = document.getElementById("published").checked;
-  const carton_quantity = parseInt(document.getElementById("carton_quantity").value) || null;
-  const youtube_url = document.getElementById("youtube_url").value;
-  const imageFiles = document.getElementById("images").files;
-  const videoFile = document.getElementById("video").files[0];
-
-  const image_urls = await getImageUrls(imageFiles);
-  const video_url = videoFile ? await uploadVideo(videoFile) : null;
-
-  return {
-    name, category, tags, price, discount, description,
-    published, carton_quantity, youtube_url,
-    image_urls, video_url
-  };
-}
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  try {
-    const product = await extractFormData();
-    const { error } = await supabase.from("products").insert([product]);
-    if (error) throw error;
-    log("✅ Product saved successfully.");
-    resetForm();
-    fetchProducts();
-  } catch (err) {
-    log("❌ Error saving product: " + err.message);
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner"></span> Saving...';
+  showSpinner();
+
+  const name = nameInput.value.trim();
+  const category = categoryInput.value;
+  const tags = tagsInput.value.trim();
+  const price = parseFloat(priceInput.value);
+  const discount = discountInput?.value ? parseFloat(discountInput.value) : null;
+  const description = quill.root.innerHTML.trim();
+  const youtube_url = youtubeInput.value.trim();
+  const carton_quantity = parseInt(cartonQuantityInput.value);
+  const published = publishedInput.checked;
+  const videoFile = videoInput.files[0];
+
+  if (!name || !category || !price) {
+    alert("Please fill all required fields.");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "💾 Save Product";
+    hideSpinner();
+    return;
   }
+
+  try {
+    const imageUrls = [];
+    for (let item of allImageItems) {
+      if (item.type === "existing") {
+        imageUrls.push(item.url);
+      } else {
+        const url = await uploadFile(item.file, "product-images");
+        imageUrls.push(url);
+      }
+    }
+
+    let videoUrl = existingVideoUrl;
+    if (videoFile) {
+      videoUrl = await uploadFile(videoFile, "product-videos");
+      log(`🎞 Uploaded video: ${videoFile.name}`);
+    }
+
+    const productData = {
+      name, category, tags, price,
+      discount_percent: discount,
+      description_html: description,
+      published, carton_quantity,
+      image_urls: imageUrls,
+      video_url: videoUrl,
+      ...(youtube_url && { youtube_url })
+    };
+
+    let response;
+    if (editingProductId) {
+      response = await client.from("products").update(productData).eq("id", editingProductId);
+    } else {
+      response = await client.from("products").insert([productData]);
+    }
+
+    if (response.error) {
+      log(`❌ DB Error: ${response.error.message}`);
+      showToast("An error occurred", "error");
+    } else {
+      showToast(editingProductId ? "Product updated" : "Product created", "success");
+      editingProductId = null;
+      allImageItems = [];
+      existingVideoUrl = "";
+      form.reset();
+      quill.setContents([]);
+      previewContainer.innerHTML = "";
+      videoPreviewContainer.innerHTML = "";
+      loadProducts();
+    }
+  } catch (err) {
+    log("❌ Upload failed: " + err.message);
+    showToast("Upload failed", "error");
+  }
+
+  hideSpinner();
+  submitBtn.disabled = false;
+  submitBtn.textContent = "💾 Save Product";
 });
 
-async function fetchProducts() {
-  const { data, error } = await supabase.from("products").select("*").order("id", { ascending: false });
-  if (error) return log("❌ Error fetching products: " + error.message);
-  renderProducts(data);
-}
+previewBtn.addEventListener("click", () => {
+  const name = nameInput.value;
+  const category = categoryInput.value;
+  const price = priceInput.value;
+  const discount = discountInput.value;
+  const published = publishedInput.checked;
+  const description = quill.root.innerHTML;
+  const carton_quantity = cartonQuantityInput.value;
+  const youtube_url = youtubeInput.value;
 
-function renderProducts(products) {
-  productTableBody.innerHTML = "";
-  products.forEach(p => {
-    const hasDiscount = p.discount && p.discount > 0;
-    const discountedPrice = hasDiscount ? p.price * (1 - p.discount / 100) : p.price;
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${p.id}</td>
-      <td><img src="${p.image_urls[0]}" class="thumbnail-img" width="50" /></td>
+  const imageHTML = allImageItems.map(item => {
+    const src = item.type === "existing" ? item.url : URL.createObjectURL(item.file);
+    return `<img src="${src}" class="preview-thumb" />`;
+  }).join("");
+
+  const videoHTML = videoInput.files[0]
+    ? `<video controls class="preview-video"><source src="${URL.createObjectURL(videoInput.files[0])}" /></video>`
+    : existingVideoUrl ? `<video controls class="preview-video"><source src="${existingVideoUrl}" /></video>` : "";
+
+  const youtubeEmbed = youtube_url
+    ? `<div class="preview-youtube"><iframe width="100%" height="200" src="${youtube_url}" frameborder="0" allowfullscreen></iframe></div>`
+    : "";
+
+  previewContent.innerHTML = `
+    <div class="preview-header">
+      <h2>${name}</h2>
+      <button class="close-preview" onclick="previewModal.style.display='none'">✖</button>
+    </div>
+
+    <div class="preview-grid">
+      <div class="preview-left">
+        <p><strong>Category:</strong> ${category}</p>
+        <p><strong>Price:</strong> ₦${price} ${discount ? `– ${discount}% off` : ""}</p>
+        <p><strong>Status:</strong> ${published ? "✅ Published" : "⛔ Unpublished"}</p>
+        <p><strong>Carton Quantity:</strong> ${carton_quantity || "N/A"}</p>
+        <div class="preview-description">${description}</div>
+        ${youtubeEmbed}
+      </div>
+
+      <div class="preview-right">
+        <div class="preview-images">${imageHTML}</div>
+        ${videoHTML}
+      </div>
+    </div>
+  <button onclick="previewModal.style.display='none'">Close Preview</button>
+  `;
+  previewModal.style.display = "flex";
+});
+
+window.editProduct = async function (id) {
+  const { data, error } = await client.from("products").select("*").eq("id", id).single();
+  if (error) return alert("❌ Failed to load product for editing.");
+
+  editingProductId = id;
+  allImageItems = (data.image_urls || []).map(url => ({ type: "existing", url }));
+  existingVideoUrl = data.video_url || "";
+
+  nameInput.value = data.name;
+  categoryInput.value = data.category;
+  tagsInput.value = data.tags || "";
+  priceInput.value = data.price;
+  discountInput.value = data.discount_percent || "";
+  cartonQuantityInput.value = data.carton_quantity || "";
+  youtubeInput.value = data.youtube_url || "";
+  quill.root.innerHTML = data.description_html || "";
+  publishedInput.checked = data.published;
+
+  renderImagePreview();
+  videoPreviewContainer.innerHTML = existingVideoUrl ? `<video controls width="200"><source src="${existingVideoUrl}" /></video>` : "";
+
+  form.scrollIntoView({ behavior: "smooth" });
+  document.querySelectorAll(".form-group").forEach(f => f.classList.add("editing-highlight"));
+  setTimeout(() => {
+    document.querySelectorAll(".form-group").forEach(f => f.classList.remove("editing-highlight"));
+  }, 2000);
+
+  showToast("✏️ Product loaded for editing", "info");
+};
+
+// ... Keep your deleteProduct, loadProducts, fetchCategories as is
+window.deleteProduct = async function (id) {
+  if (!confirm("Are you sure you want to delete this product?")) return;
+  const { error } = await client.from("products").delete().eq("id", id);
+  if (error) {
+    showToast("❌ Failed to delete", "error");
+  } else {
+    showToast("🗑 Product deleted", "success");
+    loadProducts();
+  }
+};
+
+async function loadProducts(page = 1) {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const search = searchInput.value.trim();
+  const category = filterCategory.value;
+
+  let query = client.from("products").select("*", { count: "exact" }).order("id", { ascending: false }).range(from, to);
+  if (search) query = query.ilike("name", `%${search}%`);
+  if (category) query = query.eq("category", category);
+
+  const { data, error, count } = await query;
+  if (error) return log("❌ Failed to load products");
+
+  productTable.innerHTML = data.map(p => `
+    <tr>
+      <td>#${p.product_number || p.id}</td>
+      <td><img src="${p.image_urls?.[0] || 'https://cdn-icons-png.flaticon.com/512/2965/2965567.png'}" class="thumbnail-img" style="width: 60px; height: 60px; object-fit: cover;" /></td>
       <td>${p.name}</td>
       <td>${p.category}</td>
+      <td>${p.discount_percent ? `<s>₦${p.price}</s> <strong>₦${(p.price * (1 - p.discount_percent / 100)).toFixed(2)} (${p.discount_percent}% OFF)</strong>` : `₦${p.price}`}</td>
+      <td>${p.published ? "✅ Published" : "⛔ Unpublished"}</td>
       <td>
-        ${hasDiscount ? `<s>₦${p.price}</s> <strong>₦${discountedPrice.toFixed(2)}</strong>` : `₦${p.price}`}
+        <button onclick="editProduct('${p.id}')">✏️ Edit</button>
+        <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
       </td>
-      <td>${p.published ? "✅" : "❌"}</td>
-      <td>
-        <button onclick="editProduct(${p.id})">✏️ Edit</button>
-      </td>
-    `;
-    productTableBody.appendChild(row);
-  });
+    </tr>
+  `).join("");
+
+  const totalPages = Math.ceil(count / pageSize);
+  pagination.innerHTML = `
+    ${page > 1 ? `<button onclick="loadProducts(${page - 1})">⬅ Prev</button>` : ""}
+    Page ${page} of ${totalPages}
+    ${page < totalPages ? `<button onclick="loadProducts(${page + 1})">Next ➡</button>` : ""}
+  `;
+  currentPage = page;
 }
 
-async function editProduct(id) {
-  const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
-  if (error) return log("❌ Cannot load product: " + error.message);
-  document.getElementById("name").value = data.name;
-  document.getElementById("category").value = data.category;
-  document.getElementById("tags").value = data.tags;
-  document.getElementById("price").value = data.price;
-  document.getElementById("discount").value = data.discount;
-  document.getElementById("carton_quantity").value = data.carton_quantity;
-  document.getElementById("youtube_url").value = data.youtube_url;
-  document.getElementById("published").checked = data.published;
-  quill.root.innerHTML = data.description;
-}
-
-searchInput.addEventListener("input", async () => {
-  const query = searchInput.value.toLowerCase();
-  const { data, error } = await supabase.from("products").select("*");
-  if (error) return;
-  const filtered = data.filter(p => p.name.toLowerCase().includes(query));
-  renderProducts(filtered);
-});
-
-filterCategory.addEventListener("change", async () => {
-  const cat = filterCategory.value;
-  const { data, error } = await supabase.from("products").select("*");
-  if (error) return;
-  const filtered = cat ? data.filter(p => p.category == cat) : data;
-  renderProducts(filtered);
-});
+searchInput.addEventListener("input", () => loadProducts(1));
+filterCategory.addEventListener("change", () => loadProducts(1));
 
 fetchCategories();
-fetchProducts();
-                                                                                   
+loadProducts();
+
