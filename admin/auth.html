@@ -109,15 +109,139 @@
       <div><a id="toggle-forgot">Forgot Password?</a></div>
     </div>
   </div>
-
-  <script src="config.js"></script>
-  <script src="auth.js"></script>
   <script>
-    // ✅ Supabase Configuration for Liyog Pharmacy Dashboard
+  
+// Form containers
+const loginForm = document.getElementById("login-form");
+const signupForm = document.getElementById("signup-form");
+const forgotForm = document.getElementById("forgot-form");
+
+// Toggle buttons
+const toggleSignup = document.getElementById("toggle-signup");
+const toggleLogin = document.getElementById("toggle-login");
+const toggleForgot = document.getElementById("toggle-forgot");
+const formTitle = document.getElementById("form-title");
+
+// -------------------- Form Switching -----------------------
+toggleSignup.addEventListener("click", () => {
+  loginForm.classList.add("hidden");
+  forgotForm.classList.add("hidden");
+  signupForm.classList.remove("hidden");
+  formTitle.innerText = "Sign Up";
+  toggleSignup.classList.add("hidden");
+  toggleLogin.classList.remove("hidden");
+});
+
+toggleLogin.addEventListener("click", () => {
+  signupForm.classList.add("hidden");
+  forgotForm.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+  formTitle.innerText = "Login";
+  toggleSignup.classList.remove("hidden");
+  toggleLogin.classList.add("hidden");
+});
+
+toggleForgot.addEventListener("click", () => {
+  signupForm.classList.add("hidden");
+  loginForm.classList.add("hidden");
+  forgotForm.classList.remove("hidden");
+  formTitle.innerText = "Reset Password";
+  toggleSignup.classList.remove("hidden");
+  toggleLogin.classList.remove("hidden");
+});
+
+  </script>
+  
+  <script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+   // ✅ Supabase Configuration for Liyog Pharmacy Dashboard
 const SUPABASE_URL = "https://snwwlewjriuqrodpjhry.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3dsZXdqcml1cXJvZHBqaHJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2MDY3MDAsImV4cCI6MjA2ODE4MjcwMH0.WxOmEHxLcEHmMKFjsgrzcb22mPs-sJwW_G3GOuXX2c8";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  </script>
+  
+  const messageBox = document.getElementById("auth-message");
+
+  // -------------------- Sign Up -----------------------
+  document.getElementById("signup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    messageBox.textContent = "";
+
+    const username = document.getElementById("signup-username").value;
+    const phone = document.getElementById("signup-phone").value;
+    const email = document.getElementById("signup-email").value;
+    const password = document.getElementById("signup-password").value;
+
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+          phone,
+        }
+      }
+    });
+
+    if (error) {
+      messageBox.textContent = error.message;
+    } else {
+      messageBox.style.color = "green";
+      messageBox.textContent = "Signup successful! Redirecting...";
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+    }
+  });
+
+  // -------------------- Login -----------------------
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    messageBox.textContent = "";
+
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      messageBox.textContent = "Login failed: " + error.message;
+    } else {
+      messageBox.style.color = "green";
+      messageBox.textContent = "Login successful! Redirecting...";
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+    }
+  });
+
+  // -------------------- Password Reset -----------------------
+  document.getElementById("forgot-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    messageBox.textContent = "";
+
+    const email = document.getElementById("forgot-email").value;
+    const { data, error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html"
+    });
+
+    if (error) {
+      messageBox.textContent = error.message;
+    } else {
+      messageBox.style.color = "green";
+      messageBox.textContent = "Password reset email sent!";
+    }
+  });
+
+  // -------------------- Auto-Redirect if Already Logged In -----------------------
+  document.addEventListener("DOMContentLoaded", async () => {
+    const { data: { session } } = await client.auth.getSession();
+    if (session) {
+      window.location.href = "dashboard.html";
+    }
+  });
+</script>
+  
 </body>
   </html>
