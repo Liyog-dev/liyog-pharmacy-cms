@@ -47,7 +47,7 @@ window.handlePasswordReset = async () => {
 
     // Redirect to login after short delay
     setTimeout(() => {
-      window.location.href = "auth.html"; // 👈 change this if your login page has a different name
+      window.location.href = "https://Liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html"; // 👈 change this if your login page has a different name
     }, 2500);
   }
 };
