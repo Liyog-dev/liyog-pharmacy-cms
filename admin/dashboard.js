@@ -1,5 +1,45 @@
 
 // 📦 Final dashboard.js with full image/video edit support
+// 🔐 Protect dashboard: Only allow logged-in users (admin only)
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { session }, error } = await client.auth.getSession();
+
+  if (error || !session) {
+    window.location.href = "https://Liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html"; // 🔁 redirect to login if not logged in
+    return;
+  }
+
+  // ✅ OPTIONAL: Check if the user is an admin
+  const userEmail = session.user.email;
+
+  // 🛡️ Option 1: Basic email check
+  const allowedAdminEmail = "ejumahbartholomew@gmail.com"; // Replace with your actual email
+  if (userEmail !== allowedAdminEmail) {
+    alert("Access denied. Admins only.");
+    await client.auth.signOut();
+    window.location.href = "https://Liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html";
+    return;
+  }
+
+  // 🛡️ Option 2 (Advanced): Query your profile table to check for a role
+  /*
+  const { data: profile } = await client
+    .from("profile")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  if (!profile || profile.role !== "admin") {
+    alert("Access denied. Admins only.");
+    await client.auth.signOut();
+    window.location.href = "/auth.html";
+    return;
+  }
+  */
+
+  // 🟢 If passed, user stays on dashboard
+  console.log("✅ Authenticated admin:", userEmail);
+});
 
 // 🌐 Global Elements
 const form = document.getElementById("product-form");
@@ -358,4 +398,8 @@ filterCategory.addEventListener("change", () => loadProducts(1));
 
 fetchCategories();
 loadProducts();
+async function logout() {
+  await client.auth.signOut();
+  window.location.href = "https://Liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html";
+}
 
