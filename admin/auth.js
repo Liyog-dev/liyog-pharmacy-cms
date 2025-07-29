@@ -1,117 +1,89 @@
-// Ensure Supabase client is loaded from config.js
-const authMsg = document.getElementById("auth-message");
 
-// Form containers
-const loginForm = document.getElementById("login-form");
-const signupForm = document.getElementById("signup-form");
-const forgotForm = document.getElementById("forgot-form");
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-// Toggle buttons
-const toggleSignup = document.getElementById("toggle-signup");
-const toggleLogin = document.getElementById("toggle-login");
-const toggleForgot = document.getElementById("toggle-forgot");
-const formTitle = document.getElementById("form-title");
+const SUPABASE_URL = "https://snwwlewjriuqrodpjhry.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3dsZXdqcml1cXJvZHBqaHJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2MDY3MDAsImV4cCI6MjA2ODE4MjcwMH0.WxOmEHxLcEHmMKFjsgrzcb22mPs-sJwW_G3GOuXX2c8";
+// replace with your actual anon key
+const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// -------------------- Form Switching -----------------------
-toggleSignup.addEventListener("click", () => {
-  loginForm.classList.add("hidden");
-  forgotForm.classList.add("hidden");
-  signupForm.classList.remove("hidden");
-  formTitle.innerText = "Sign Up";
-  toggleSignup.classList.add("hidden");
-  toggleLogin.classList.remove("hidden");
-});
+const messageBox = document.getElementById("auth-message");
 
-toggleLogin.addEventListener("click", () => {
-  signupForm.classList.add("hidden");
-  forgotForm.classList.add("hidden");
-  loginForm.classList.remove("hidden");
-  formTitle.innerText = "Login";
-  toggleSignup.classList.remove("hidden");
-  toggleLogin.classList.add("hidden");
-});
-
-toggleForgot.addEventListener("click", () => {
-  signupForm.classList.add("hidden");
-  loginForm.classList.add("hidden");
-  forgotForm.classList.remove("hidden");
-  formTitle.innerText = "Reset Password";
-  toggleSignup.classList.remove("hidden");
-  toggleLogin.classList.remove("hidden");
-});
+// Helper to show message
+function showMessage(msg, isError = true) {
+  messageBox.style.color = isError ? "red" : "green";
+  messageBox.textContent = msg;
+}
 
 // -------------------- Sign Up -----------------------
-signupForm.addEventListener("submit", async (e) => {
+document.getElementById("signup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  authMsg.innerText = "Creating account...";
+  showMessage("");
 
-  const email = document.getElementById("signup-email").value.trim();
-  const password = document.getElementById("signup-password").value.trim();
-  const username = document.getElementById("signup-username").value.trim();
-  const phone = document.getElementById("signup-phone").value.trim();
+  const username = document.getElementById("signup-username").value;
+  const phone = document.getElementById("signup-phone").value;
+  const email = document.getElementById("signup-email").value;
+  const password = document.getElementById("signup-password").value;
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await client.auth.signUp({
     email,
-    password
+    password,
+    options: { data: { username, phone } }
   });
 
+  console.log("Signup result:", data, error);
+
   if (error) {
-    authMsg.innerText = error.message;
-    return;
-  }
-
-  const userId = data.user?.id;
-
-  if (userId) {
-    await supabase.from("profiles").insert([{ id: userId, username, phone }]);
-    authMsg.innerText = "Account created! Check your email to confirm.";
+    showMessage(error.message);
+  } else {
+    showMessage("Signup successful! Redirecting…", false);
+    setTimeout(() => window.location.href = "dashboard.html", 1500);
   }
 });
 
 // -------------------- Login -----------------------
-loginForm.addEventListener("submit", async (e) => {
+document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  authMsg.innerText = "Logging in...";
+  showMessage("");
 
-  const email = document.getElementById("login-email").value.trim();
-  const password = document.getElementById("login-password").value.trim();
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+  console.log("Login result:", data, error);
 
   if (error) {
-    authMsg.innerText = error.message;
-    return;
+    showMessage("Login failed: " + error.message);
+  } else {
+    showMessage("Login successful! Redirecting…", false);
+    setTimeout(() => window.location.href = "dashboard.html", 1500);
   }
-
-  // Redirect to dashboard on successful login
-  window.location.href = "dashboard.html";
 });
 
-// -------------------- Forgot Password -----------------------
-forgotForm.addEventListener("submit", async (e) => {
+// -------------------- Password Reset -----------------------
+document.getElementById("forgot-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  authMsg.innerText = "Sending reset link...";
+  showMessage("");
 
-  const email = document.getElementById("forgot-email").value.trim();
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: "https://yourdomain.com/auth.html"
+  const email = document.getElementById("forgot-email").value;
+  const { data, error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: "auth.html"
   });
 
+  console.log("Reset request:", data, error);
+
   if (error) {
-    authMsg.innerText = error.message;
+    showMessage(error.message);
   } else {
-    authMsg.innerText = "Reset link sent to your email!";
+    showMessage("Password reset email sent!", false);
   }
 });
 
-// -------------------- Auto Redirect If Already Logged In -----------------------
-supabase.auth.getSession().then(({ data: { session } }) => {
+// -------------------- Auto-Redirect if Already Logged In -----------------------
+document.addEventListener("DOMContentLoaded", async () => {
+  const { data: { session } } = await client.auth.getSession();
+  console.log("Session on load:", session);
   if (session) {
     window.location.href = "dashboard.html";
   }
 });
-
-
-
-    
