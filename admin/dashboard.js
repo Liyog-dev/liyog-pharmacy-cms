@@ -400,6 +400,6 @@ fetchCategories();
 loadProducts();
 async function logout() {
   await client.auth.signOut();
-  window.location.href = "https://Liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html";
+  window.location.href = "auth.html";
 }
 
