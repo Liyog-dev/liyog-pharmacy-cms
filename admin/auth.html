@@ -221,7 +221,7 @@ document.getElementById("forgot-form").addEventListener("submit", async (e) => {
 
   const email = document.getElementById("forgot-email").value;
   const { data, error } = await client.auth.resetPasswordForEmail(email, {
-    redirectTo: "https://liyog-dev.github.io/liyog-pharmacy-cms/admin/auth.html"
+    redirectTo: "auth.html"
   });
 
   console.log("Reset request:", data, error);
