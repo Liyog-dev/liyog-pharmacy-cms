@@ -63,6 +63,7 @@ const filterCategory = document.getElementById("filter-category");
 const pagination = document.getElementById("pagination");
 const videoPreviewContainer = document.getElementById("video-preview") || document.createElement("div");
 const submitBtn = document.getElementById("submit-button");
+const liyogxCoinsInput = document.getElementById("liyogx_coins");
 
 const quill = new Quill("#editor", { theme: "snow" });
 let currentPage = 1;
@@ -98,7 +99,7 @@ const showSpinner = (text = "Saving") => {
   `;
   spinnerOverlay.innerHTML = `
     <div class="spinner"></div>
-    <div style="margin-top: 10px;">LiyoRix<br><small>${text}...</small></div>
+    <div style="margin-top: 10px;">LiyXStore Global..<br><small>${text}...</small></div>
   `;
   document.body.appendChild(spinnerOverlay);
 };
@@ -197,6 +198,8 @@ form.addEventListener("submit", async (e) => {
   const carton_quantity = parseInt(cartonQuantityInput.value);
   const published = publishedInput.checked;
   const videoFile = videoInput.files[0];
+  const liyogx_coins = liyogxCoinsInput.value ? parseFloat(liyogxCoinsInput.value) : null;
+
 
   if (!name || !category || !price) {
     alert("Please fill all required fields.");
@@ -230,7 +233,8 @@ form.addEventListener("submit", async (e) => {
       published, carton_quantity,
       image_urls: imageUrls,
       video_url: videoUrl,
-      ...(youtube_url && { youtube_url })
+      ...(youtube_url && { youtube_url }),
+      ...(liyogx_coins !== null && { liyogx_coins })
     };
 
     let response;
@@ -330,6 +334,7 @@ window.editProduct = async function (id) {
   youtubeInput.value = data.youtube_url || "";
   quill.root.innerHTML = data.description_html || "";
   publishedInput.checked = data.published;
+  liyogxCoinsInput.value = data.liyogx_coins || "";
 
   renderImagePreview();
   videoPreviewContainer.innerHTML = existingVideoUrl ? `<video controls width="200"><source src="${existingVideoUrl}" /></video>` : "";
