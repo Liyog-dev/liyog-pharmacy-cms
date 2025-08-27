@@ -360,6 +360,22 @@ window.deleteProduct = async function (id) {
   }
 };
 
+
+async function buildUserMap() {
+  const { data: users, error } = await client
+    .from("users")
+    .select("id, name, role");
+
+  if (!error && users) {
+    window.userMap = {};
+    users.forEach(u => {
+      if (u.role === "admin") {
+        window.userMap[u.id] = u.name || "Admin";
+      }
+    });
+  }
+}
+
 async function loadProducts(page = 1) {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -374,6 +390,7 @@ async function loadProducts(page = 1) {
   const { data, error, count } = await query;
   if (error) return log("❌ Failed to load products");
 
+  
   productTable.innerHTML = data.map(p => {
   const discountPrice = p.discount_percent
     ? (p.price * (1 - p.discount_percent / 100)).toFixed(2)
@@ -430,8 +447,12 @@ async function loadProducts(page = 1) {
 searchInput.addEventListener("input", () => loadProducts(1));
 filterCategory.addEventListener("change", () => loadProducts(1));
 
-fetchCategories();
-loadProducts();
+(async () => {
+  await buildUserMap();
+  await fetchCategories();
+  await loadProducts();
+})();
+
 async function logout() {
   await client.auth.signOut();
   window.location.href = "auth.html";
