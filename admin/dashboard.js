@@ -360,7 +360,7 @@ window.deleteProduct = async function (id) {
   }
 };
 
-
+//This is the check for added_by for admins for now
 async function buildUserMap() {
   const { data: users, error } = await client
     .from("users")
@@ -447,6 +447,7 @@ async function loadProducts(page = 1) {
 searchInput.addEventListener("input", () => loadProducts(1));
 filterCategory.addEventListener("change", () => loadProducts(1));
 
+//for helping added_by functions
 (async () => {
   await buildUserMap();
   await fetchCategories();
