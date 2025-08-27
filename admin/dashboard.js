@@ -1,6 +1,39 @@
 
 // 📦 Final dashboard.js with full image/video edit support
 // 🔐 Protect dashboard: Only allow logged-in users (admin only)
+// 🔐 Enforce role-based access using your `users` table
+async function enforceAdminAccess(session) {
+  if (!session?.user) {
+    alert("You must log in first.");
+    window.location.href = "/auth.html";
+    return;
+  }
+
+  const { data: user, error } = await client
+    .from("users")
+    .select("id, role, is_active")
+    .eq("id", session.user.id)
+    .single();
+
+  if (error) {
+    console.error("Error fetching user role:", error.message);
+    alert("Something went wrong. Please try again.");
+    await client.auth.signOut();
+    window.location.href = "/auth.html";
+    return;
+  }
+
+  // ✅ Secure checks
+  if (!user || user.role !== "admin" || user.is_active === false) {
+    alert("Access denied. Admins only.");
+    await client.auth.signOut();
+    window.location.href = "/auth.html";
+    return;
+  }
+
+  console.log("✅ Admin access granted:", user.id);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: { session }, error } = await client.auth.getSession();
 
@@ -9,36 +42,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // ✅ OPTIONAL: Check if the user is an admin
-  const userEmail = session.user.email;
-
-  // 🛡️ Option 1: Basic email check
-  const allowedAdminEmail = "ejumahbartholomew@gmail.com"; // Replace with your actual email
-  if (userEmail !== allowedAdminEmail) {
-    alert("Access denied. Admins only.");
-    await client.auth.signOut();
-    window.location.href = "auth.html";
-    return;
-  }
-
-  // 🛡️ Option 2 (Advanced): Query your profile table to check for a role
-  /*
-  const { data: profile } = await client
-    .from("profile")
-    .select("role")
-    .eq("id", session.user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    alert("Access denied. Admins only.");
-    await client.auth.signOut();
-    window.location.href = "/auth.html";
-    return;
-  }
-  */
+  // ✅ Use advanced check from users table
+  await enforceAdminAccess(session);
 
   // 🟢 If passed, user stays on dashboard
-  console.log("✅ Authenticated admin:", userEmail);
+  console.log("✅ Authenticated admin:", session.user.email);
 });
 
 // 🌐 Global Elements
