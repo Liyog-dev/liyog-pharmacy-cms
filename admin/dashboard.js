@@ -234,7 +234,9 @@ form.addEventListener("submit", async (e) => {
       image_urls: imageUrls,
       video_url: videoUrl,
       ...(youtube_url && { youtube_url }),
-      ...(liyogx_coins !== null && { liyogx_coins })
+      ...(liyogx_coins !== null && { liyogx_coins }),
+      added_by: session.user.id   // ✅ attach uploader's UUID
+      
     };
 
     let response;
