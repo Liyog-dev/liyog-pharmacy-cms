@@ -374,20 +374,49 @@ async function loadProducts(page = 1) {
   const { data, error, count } = await query;
   if (error) return log("❌ Failed to load products");
 
-  productTable.innerHTML = data.map(p => `
+  productTable.innerHTML = data.map(p => {
+  const discountPrice = p.discount_percent
+    ? (p.price * (1 - p.discount_percent / 100)).toFixed(2)
+    : null;
+
+  // Format dates nicely (YYYY-MM-DD hh:mm)
+  const createdAt = p.created_at ? new Date(p.created_at).toLocaleString() : "—";
+  const updatedAt = p.updated_at ? new Date(p.updated_at).toLocaleString() : "—";
+
+  // Added By logic
+  let addedByName = "LiyXStore"; // default
+  if (p.added_by) {
+    // We'll resolve UUID → user.name below
+    addedByName = window.userMap?.[p.added_by] || p.added_by;
+  }
+
+  return `
     <tr>
       <td>#${p.product_number || p.id}</td>
-      <td><img src="${p.image_urls?.[0] || 'https://cdn-icons-png.flaticon.com/512/2965/2965567.png'}" class="thumbnail-img" style="width: 60px; height: 60px; object-fit: cover;" /></td>
+      <td><img src="${p.image_urls?.[0] || 
+        'https://cdn-icons-png.flaticon.com/512/2965/2965567.png'}" 
+        class="thumbnail-img" style="width: 60px; height: 60px; object-fit: cover;" /></td>
       <td>${p.name}</td>
       <td>${p.category}</td>
-      <td>${p.discount_percent ? `<s>₦${p.price}</s> <strong>₦${(p.price * (1 - p.discount_percent / 100)).toFixed(2)} (${p.discount_percent}% OFF)</strong>` : `₦${p.price}`}</td>
+      <td>
+        ${p.discount_percent 
+          ? `<s>₦${p.price}</s> <strong>₦${discountPrice} (${p.discount_percent}% OFF)</strong>` 
+          : `₦${p.price}`}
+      </td>
+      <td>${p.carton_quantity ?? "—"}</td>
+      <td>₦${p.carton_price ?? "—"}</td>
+      <td>${p.liyogx_coins ?? "0"}</td>
+      <td>${createdAt}</td>
+      <td>${updatedAt}</td>
+      <td>${addedByName}</td>
       <td>${p.published ? "✅ Published" : "⛔ Unpublished"}</td>
       <td>
         <button onclick="editProduct('${p.id}')">✏️ Edit</button>
         <button onclick="deleteProduct('${p.id}')">🗑 Delete</button>
       </td>
     </tr>
-  `).join("");
+  `;
+}).join("");
 
   const totalPages = Math.ceil(count / pageSize);
   pagination.innerHTML = `
