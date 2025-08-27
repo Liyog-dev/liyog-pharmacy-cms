@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const { data: { session }, error } = await client.auth.getSession();
 
   if (error || !session) {
-    window.location.href = "auth.html"; // 🔁 redirect to login if not logged in
+    window.location.href = "/auth.html"; // 🔁 redirect to login if not logged in
     return;
   }
 
