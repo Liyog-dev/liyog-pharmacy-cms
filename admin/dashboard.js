@@ -2,6 +2,7 @@
 // 📦 Final dashboard.js with full image/video edit support
 // 🔐 Protect dashboard: Only allow logged-in users (admin only)
 // 🔐 Enforce role-based access using your `users` table
+let currentSession = null;
 async function enforceAdminAccess(session) {
   if (!session?.user) {
     alert("You must log in first.");
@@ -42,6 +43,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  currentSession = session; // ✅ store session globally
+  
   // ✅ Use advanced check from users table
   await enforceAdminAccess(session);
 
@@ -243,7 +246,7 @@ form.addEventListener("submit", async (e) => {
       video_url: videoUrl,
       ...(youtube_url && { youtube_url }),
       ...(liyogx_coins !== null && { liyogx_coins }),
-      added_by: session.user.id   // ✅ attach uploader's UUID
+      added_by: currentSession.user.id // ✅ attach uploader's UUID
       
     };
 
@@ -468,4 +471,3 @@ async function logout() {
   await client.auth.signOut();
   window.location.href = "auth.html";
 }
-
