@@ -3,6 +3,20 @@
 // 🔐 Protect dashboard: Only allow logged-in users (admin only)
 // 🔐 Enforce role-based access using your `users` table
 let currentSession = null;
+// 🔄 Listen for auth changes (refresh, signout, expire)
+client.auth.onAuthStateChange((event, session) => {
+  console.log("Auth event:", event);
+
+  if (event === "TOKEN_REFRESHED") {
+    currentSession = session; // ✅ keep session fresh
+  }
+
+  if (event === "SIGNED_OUT" || !session) {
+    alert("Your session expired. Please log in again.");
+    window.location.href = "/auth.html";
+  }
+});
+
 async function enforceAdminAccess(session) {
   if (!session?.user) {
     alert("You must log in first.");
